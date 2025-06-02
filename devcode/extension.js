@@ -1,27 +1,45 @@
 const vscode = require('vscode');
+const openai = require('openai');
+const path = require('path');
+const OnlineAIClient = require('./OnlineAIClient')
 
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 /**
  * @param {vscode.ExtensionContext} context
  */
-function activate(context) {
+
+async function activate(context) {
 	console.log('Congratulations, your extension "devcode" is now active!');
 
-	
+	const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
 	const disposable = vscode.commands.registerCommand('devcode.aiAgent', function () {
-		vscode.window.showInformationMessage('activate AI Agent from devcode!');
+		vscode.window.showInformationMessage('activated devcode!');
+
 		const panel = vscode.window.createWebviewPanel(
-		'ai',
-		'Dev Code',
-		vscode.ViewColumn.Two,
-		{
-			enableScripts: true, // Allow JavaScript to run in the webview
-			retainContextWhenHidden: true, // Keep the webview alive when hidden
-		}
+			'ai',
+			'DevCode',
+			vscode.ViewColumn.Two,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+			}
 		);
 
 		panel.webview.html = getWebviewContent();
+
+		panel.webview.onDidReceiveMessage(async (message) => {
+		if (message.type === 'userInput') {
+			const messages = [{ role: "user", content: message.text }];
+
+			panel.webview.postMessage({ type: 'resetBotMessage' });
+
+			await api.chatCompletion(messages, (token) => {
+			panel.webview.postMessage({ type: 'addText', text: token });
+			});
+		}
+		});
 	});
 
 	context.subscriptions.push(disposable);
@@ -61,6 +79,43 @@ function getWebviewContent() {
 			line-height: 1.4;
 		}
 
+		.message * {
+			margin: 0;
+			padding: 0;
+		}
+
+		.message p + p,
+		.message h1 + *,
+		.message h2 + *,
+		.message h3 + *,
+		.message h4 + *,
+		.message h5 + *,
+		.message h6 + *,
+		.message ul + *,
+		.message ol + *,
+		.message pre + *,
+		.message blockquote + * {
+			margin-top: 8px;
+		}
+
+		.message li + li {
+			margin-top: 4px;
+		}
+
+		.message pre {
+			padding: 8px;
+			background-color: #2d2d2d;
+			border-radius: 4px;
+			overflow-x: auto;
+		}
+
+		.message code {
+			background-color: #2d2d2d;
+			padding: 2px 4px;
+			border-radius: 3px;
+			font-family: 'Courier New', monospace;
+		}
+
 		.user {
 			background-color: #0a84ff;
 			align-self: flex-end;
@@ -70,6 +125,7 @@ function getWebviewContent() {
 		.bot {
 			background-color: #333;
 			align-self: flex-start;
+			padding: 0 auto;
 		}
 
 		.input-container {
@@ -106,7 +162,7 @@ function getWebviewContent() {
 	<body>
 
 	<div class="chat-container" id="chat">
-		<div class="message bot">Hello! let's start building.</div>
+		<div class="message bot"><p>Hello! let's start building.</p></div>
 	</div>
 
 	<div class="input-container">
@@ -115,36 +171,67 @@ function getWebviewContent() {
 	</div>
 
 	<script>
+		const vscode = acquireVsCodeApi();
 		const chat = document.getElementById('chat');
 		const input = document.getElementById('userInput');
 
-		function sendMessage() {
-			const text = input.value.trim();
-			
-			if (!text) return;
-
-			// User
-			const userMsg = document.createElement('div');
-			userMsg.className = 'message user';
-			userMsg.textContent = text;
-			chat.appendChild(userMsg);
-
-			// Bot
-			const botMsg = document.createElement('div');
-			botMsg.className = 'message bot';
-			botMsg.textContent = getFakeResponse(text);
-			chat.appendChild(botMsg);
-
-			input.value = '';
+		function appendPlainTextMessage(sender, text) {
+			const message = document.createElement('div');
+			message.className = "message " + sender;
+			message.textContent = text;
+			chat.appendChild(message);
 			chat.scrollTop = chat.scrollHeight;
 		}
 
-		function getFakeResponse(input) {
-			return "I'm just a mock AI for now!";
+		function appendHTMLMessage(sender, html) {
+			const message = document.createElement('div');
+			message.className = "message " + sender;
+			message.innerHTML = html;
+			chat.appendChild(message);
+			chat.scrollTop = chat.scrollHeight;
 		}
 
-		input.addEventListener("keydown", e => {
-			if (e.key === "Enter") sendMessage();
+		function sendMessage() {
+			const text = input.value.trim();
+			if (!text) return;
+			appendPlainTextMessage('user', text);
+			vscode.postMessage({ type: 'userInput', text });
+			input.value = '';
+		}
+
+		input.addEventListener('keydown', e => {
+			if (e.key === 'Enter') sendMessage();
+		});
+
+		window.currentBotOutput = '';
+
+		window.addEventListener('message', event => {
+			const message = event.data;
+
+			if (message.type === 'resetBotMessage') {
+				appendPlainTextMessage('bot', '');
+				window.currentBotOutput = '';
+			}
+
+			if (message.type === 'addText') {
+				window.currentBotOutput += message.text;
+
+				const bots = chat.getElementsByClassName('bot');
+				if (bots.length === 0) return;
+				const lastBot = bots[bots.length - 1];
+
+				lastBot.innerHTML = window.currentBotOutput;
+				chat.scrollTop = chat.scrollHeight;
+			}
+
+			if (message.type === 'end') {
+				const bots = chat.getElementsByClassName('bot');
+				if (bots.length === 0) return;
+				const lastBot = bots[bots.length - 1];
+
+				lastBot.innerHTML = window.currentBotOutput;
+				chat.scrollTop = chat.scrollHeight;
+			}
 		});
 	</script>
 

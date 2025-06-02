@@ -12,10 +12,12 @@
   "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "devcode.aiAgent",
-      "title": "Activate Ai Agent"
-    }]
+    "commands": [
+      {
+        "command": "devcode.aiAgent",
+        "title": "Activate Ai Agent"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",
@@ -23,11 +25,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "eslint": "^9.25.1",
+    "@types/vscode": "^1.100.0",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "openai": "^5.0.2"
   }
 }
