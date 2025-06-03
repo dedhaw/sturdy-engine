@@ -15,9 +15,23 @@
     "commands": [
       {
         "command": "devcode.aiAgent",
-        "title": "Activate Ai Agent"
+        "title": "DevCode: Activate"
+      },
+      {
+        "command": "devcode.selectAI",
+        "title": "DevCode: Select Model"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "DevCode",
+      "properties": {
+        "devcode.selectedModel": {
+          "type": "string",
+          "default": "",
+          "description": "Currently selected AI model for DevCode extension"
+        }
+      }
+    }
   },
   "scripts": {
     "lint": "eslint .",

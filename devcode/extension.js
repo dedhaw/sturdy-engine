@@ -1,7 +1,7 @@
 const vscode = require('vscode');
-const openai = require('openai');
 const path = require('path');
-const OnlineAIClient = require('./OnlineAIClient')
+const OnlineAIClient = require('./OnlineAIClient');
+const OfflineAIClient = require('./OfflineAIClient')
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -14,7 +14,7 @@ async function activate(context) {
 
 	const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
-	const disposable = vscode.commands.registerCommand('devcode.aiAgent', function () {
+	const chat = vscode.commands.registerCommand('devcode.aiAgent', function () {
 		vscode.window.showInformationMessage('activated devcode!');
 
 		const panel = vscode.window.createWebviewPanel(
@@ -42,7 +42,72 @@ async function activate(context) {
 		});
 	});
 
-	context.subscriptions.push(disposable);
+	const selectAI = vscode.commands.registerCommand('devcode.selectAI', async function () {
+		vscode.window.showInformationMessage('select a model');
+		
+		const ollama = new OfflineAIClient();
+		try {
+			if (!(await ollama.isRunning())) {
+				vscode.window.showErrorMessage('Ollama is not running. Please start Ollama first.');
+				return;
+			}
+
+			const modelFamilies = ollama.getModelFamilies();
+			const selectedFamily = await vscode.window.showQuickPick(modelFamilies, {
+				placeHolder: 'Choose an AI model family',
+				matchOnDescription: true
+			});
+
+			if (!selectedFamily) return;
+
+			const modelSizes = ollama.getModelSizes(selectedFamily.value);
+			const selectedModel = await vscode.window.showQuickPick(modelSizes, {
+				placeHolder: `Choose ${selectedFamily.label} model size`
+			});
+
+			if (!selectedModel) return;
+			
+			const model = selectedModel['value'];
+
+			if (await ollama.modelExists(model)) {
+				vscode.window.showInformationMessage(`Model ${model} is ready!`);
+				await ollama.saveSelectedModel(model);
+			} else {
+				await vscode.window.withProgress({
+					location: vscode.ProgressLocation.Notification,
+					title: `Downloading ${model}`,
+					cancellable: true
+				}, async (progress, token) => {
+					
+					await ollama.downloadModel(model, (data) => {
+						if (data.status) {
+							progress.report({ message: data.status });
+							
+							if (data.completed && data.total) {
+								const percentage = Math.round((data.completed / data.total) * 100);
+								progress.report({ 
+									increment: percentage,
+									message: `${data.status} (${percentage}%)`
+								});
+							}
+						}
+						
+						if (token.isCancellationRequested) {
+							throw new Error('Download cancelled');
+						}
+					});
+					
+					vscode.window.showInformationMessage(`Successfully downloaded ${model}!`);
+					await ollama.saveSelectedModel(model);
+				});
+			}
+			
+		} catch (error) {
+			vscode.window.showErrorMessage(`Error: ${error.message}`);
+		}
+	});	
+
+	context.subscriptions.push(chat, selectAI);
 }
 
 function getWebviewContent() {
