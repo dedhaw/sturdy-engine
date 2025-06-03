@@ -1,7 +1,8 @@
 const vscode = require('vscode');
 const path = require('path');
 const OnlineAIClient = require('./OnlineAIClient');
-const OfflineAIClient = require('./OfflineAIClient')
+const OfflineAIClient = require('./OfflineAIClient');
+const { SYSTEM_PROMPTS, createUserMessageWithSystem } = require('./prompts');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -30,15 +31,58 @@ async function activate(context) {
 		panel.webview.html = getWebviewContent();
 
 		panel.webview.onDidReceiveMessage(async (message) => {
-		if (message.type === 'userInput') {
-			const messages = [{ role: "user", content: message.text }];
-
-			panel.webview.postMessage({ type: 'resetBotMessage' });
-
-			await api.chatCompletion(messages, (token) => {
-			panel.webview.postMessage({ type: 'addText', text: token });
-			});
-		}
+			if (message.type === 'toggleAI') {
+				const ollama = new OfflineAIClient();
+				const selectedModel = ollama.getSelectedModel();
+				
+				if (!selectedModel) {
+					const result = await vscode.window.showWarningMessage(
+						'No local model selected. Would you like to select one?', 
+						'Select Model', 'Cancel'
+					);
+					if (result === 'Select Model') {
+						vscode.commands.executeCommand('devcode.selectAI');
+					}
+					return;
+				}
+				
+				// Toggle between online and offline
+				const config = vscode.workspace.getConfiguration('devcode');
+				const currentMode = config.get('useOfflineAI', false);
+				await config.update('useOfflineAI', !currentMode, vscode.ConfigurationTarget.Global);
+				
+				panel.webview.postMessage({ 
+					type: 'aiModeChanged', 
+					isOffline: !currentMode,
+					modelName: selectedModel
+				});
+			}
+			
+			if (message.type === 'userInput') {
+				const userMessage = createUserMessageWithSystem(message.text, SYSTEM_PROMPTS.htmlFormatting);
+    			const messages = [userMessage];
+				panel.webview.postMessage({ type: 'resetBotMessage' });
+				
+				// Check which AI to use
+				const config = vscode.workspace.getConfiguration('devcode');
+				const useOfflineAI = config.get('useOfflineAI', false);
+				
+				console.log('Using offline AI:', useOfflineAI);
+				
+				if (useOfflineAI) {
+					const ollama = new OfflineAIClient();
+					console.log('Starting ollama chat completion');
+					await ollama.chatCompletion(messages, (token) => {
+						console.log('Received token from ollama:', token);
+						panel.webview.postMessage({ type: 'addText', text: token });
+						console.log('Ollama chat completion finished');
+					});
+				} else {
+					await api.chatCompletion(messages, (token) => {
+						panel.webview.postMessage({ type: 'addText', text: token });
+					});
+				}
+			}
 		});
 	});
 
@@ -66,7 +110,7 @@ async function activate(context) {
 			});
 
 			if (!selectedModel) return;
-			
+
 			const model = selectedModel['value'];
 
 			if (await ollama.modelExists(model)) {
@@ -222,12 +266,45 @@ function getWebviewContent() {
 		.input-container button:hover {
 			background-color: #006edc;
 		}
+
+		.ai-toggle-container {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 8px 12px;
+			background-color: #2c2c2c;
+			border-bottom: 1px solid #444;
+		}
+
+		#aiToggle {
+			padding: 6px 12px;
+			background-color: #0a84ff;
+			border: none;
+			border-radius: 4px;
+			color: white;
+			cursor: pointer;
+			font-size: 12px;
+		}
+
+		#aiToggle:hover {
+			background-color: #006edc;
+		}
+
+		#modelInfo {
+			font-size: 12px;
+			color: #999;
+		}
 	</style>
 	</head>
 	<body>
 
 	<div class="chat-container" id="chat">
 		<div class="message bot"><p>Hello! let's start building.</p></div>
+	</div>
+
+	<div class="ai-toggle-container">
+		<button id="aiToggle" onclick="toggleAI()">🌐 Online AI</button>
+		<span id="modelInfo">Using OpenAI</span>
 	</div>
 
 	<div class="input-container">
@@ -270,6 +347,12 @@ function getWebviewContent() {
 
 		window.currentBotOutput = '';
 
+		let isOfflineMode = false;
+
+		function toggleAI() {
+			vscode.postMessage({ type: 'toggleAI' });
+		}
+
 		window.addEventListener('message', event => {
 			const message = event.data;
 
@@ -296,6 +379,18 @@ function getWebviewContent() {
 
 				lastBot.innerHTML = window.currentBotOutput;
 				chat.scrollTop = chat.scrollHeight;
+			}
+			if (message.type === 'aiModeChanged') {
+				isOfflineMode = message.isOffline;
+				const button = document.getElementById('aiToggle');
+				const info = document.getElementById('modelInfo');
+				if (isOfflineMode) {
+					button.textContent = '💻 Local AI';
+					info.textContent = 'Local Model';
+				} else {
+					button.textContent = '🌐 Online AI';
+					info.textContent = 'Using OpenAI';
+				}
 			}
 		});
 	</script>

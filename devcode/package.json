@@ -29,6 +29,11 @@
           "type": "string",
           "default": "",
           "description": "Currently selected AI model for DevCode extension"
+        },
+        "devcode.useOfflineAI": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use local AI models instead of online API"
         }
       }
     }
