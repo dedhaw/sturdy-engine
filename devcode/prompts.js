@@ -1,5 +1,5 @@
 const SYSTEM_PROMPTS = {
-    htmlFormatting: "Please respond only using valid HTML formatting tags (like <p>, <pre>, <code>, <strong>, etc.). Do not include markdown syntax.",
+    htmlFormatting: "Only using valid HTML formatting tags (like <p>, <pre>, <code>, <strong>, etc.). Do not include markdown syntax.",
     
     codeExplanation: "Please explain this code step by step, focusing on what each part does.",
     debugging: "Please help debug this code and suggest fixes.",
