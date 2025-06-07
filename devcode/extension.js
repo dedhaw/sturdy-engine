@@ -15,6 +15,15 @@ async function activate(context) {
 
 	const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
+	const activeEditor = vscode.window.activeTextEditor;
+
+	if (activeEditor) {
+		const doc = activeEditor.document;
+		const txt = doc.getText();
+		const name = doc.fileName;
+		const lang = doc.languageId;
+	}
+
 	const chat = vscode.commands.registerCommand('devcode.aiAgent', function () {
 		vscode.window.showInformationMessage('activated devcode!');
 
