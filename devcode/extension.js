@@ -28,9 +28,23 @@ async function activate(context) {
 			lang: doc.languageId,
 			highlight: doc.getText(activeEditor.selection),
 			lines: doc.languageId,
-			isDirty: doc.isDirty
+			isSaved: doc.isDirty
+		}		
+	}
+
+	function getWorkSpaceContext() {
+		const dir = vscode.workspace.workspaceFolders?.[0];
+		const visibleEditors = vscode.window.visibleTextEditors;
+
+		return {
+			dirname: dir?.name || "None",
+			path: dir?.uri.fsPath || "",
+			openFiles: visibleEditors.map(editor => ({
+				name: editor.document.fileName,
+				lang: editor.document.languageId,
+				isSaved: editor.document.isDirty
+			}))
 		}
-		
 	}
 
 	const chat = vscode.commands.registerCommand('devcode.aiAgent', function () {
