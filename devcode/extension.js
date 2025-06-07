@@ -15,13 +15,22 @@ async function activate(context) {
 
 	const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
-	const activeEditor = vscode.window.activeTextEditor;
+	function getContext() {
+		const activeEditor = vscode.window.activeTextEditor;
 
-	if (activeEditor) {
+		if (!activeEditor) return;
+
 		const doc = activeEditor.document;
-		const txt = doc.getText();
-		const name = doc.fileName;
-		const lang = doc.languageId;
+		
+		return {
+			txt: doc.getText(),
+			name: doc.fileName,
+			lang: doc.languageId,
+			highlight: doc.getText(activeEditor.selection),
+			lines: doc.languageId,
+			isDirty: doc.isDirty
+		}
+		
 	}
 
 	const chat = vscode.commands.registerCommand('devcode.aiAgent', function () {
