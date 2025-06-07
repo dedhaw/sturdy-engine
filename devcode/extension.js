@@ -11,12 +11,14 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
  */
 
 async function activate(context) {
+	const capturedEditor = vscode.window.activeTextEditor;
+
 	console.log('Congratulations, your extension "devcode" is now active!');
 
 	const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
-	function getContext() {
-		const activeEditor = vscode.window.activeTextEditor;
+	function getContext(editor = null) {
+		const activeEditor = editor || vscode.window.activeTextEditor;
 
 		if (!activeEditor) return;
 
@@ -91,6 +93,12 @@ async function activate(context) {
 			}
 			
 			if (message.type === 'userInput') {
+				const context = getContext(capturedEditor);
+				const workspace = getWorkSpaceContext();
+
+				console.log('file: ', context)
+				console.log('workspace ', workspace)
+
 				const userMessage = createUserMessageWithSystem(message.text, SYSTEM_PROMPTS.htmlFormatting);
     			const messages = [userMessage];
 				panel.webview.postMessage({ type: 'resetBotMessage' });
