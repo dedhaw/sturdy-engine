@@ -230,7 +230,7 @@ function getWebviewContent() {
 				const info = document.getElementById('modelInfo');
 				if (isOfflineMode) {
 					button.textContent = '💻 Local AI';
-					info.textContent = 'Local Model';
+					info.textContent = 'Using Local Model';
 				} else {
 					button.textContent = '🌐 Online AI';
 					info.textContent = 'Using OpenAI';
