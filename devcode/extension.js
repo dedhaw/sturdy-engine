@@ -1,10 +1,7 @@
 
 const vscode = require('vscode');
-const path = require('path');
 const chatRequest = require('./commands/Chat');
-const offlineSelctor = require('./commands/SelectAI');
-
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const { selector } = require('./commands/SelectAI');
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -15,7 +12,7 @@ async function activate(context) {
 
 	const chat = vscode.commands.registerCommand('devcode.aiAgent', chatRequest);
 
-	const selectAI = vscode.commands.registerCommand('devcode.selectAI', offlineSelctor);	
+	const selectAI = vscode.commands.registerCommand('devcode.selectAI', selector);	
 
 	context.subscriptions.push(chat, selectAI);
 }

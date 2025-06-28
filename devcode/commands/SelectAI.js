@@ -66,4 +66,13 @@ async function selector() {
     }
 }
 
-module.exports = selector;
+function getCurrentModel() {
+  const ollama = new OfflineAIClient();
+  const model = ollama.getSelectedModel();
+  return model || null;
+}
+
+module.exports = {
+    selector,
+    getCurrentModel
+};

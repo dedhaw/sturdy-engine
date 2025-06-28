@@ -1,4 +1,9 @@
+const { getCurrentModel } = require("../commands/SelectAI")
+
 function getWebviewContent() {
+	  const currModel = getCurrentModel() || "OpenAI";
+  	const currModelEscaped = JSON.stringify(currModel);
+
     return /* html */ `
 	<!DOCTYPE html>
 	<html lang="en">
@@ -141,104 +146,78 @@ function getWebviewContent() {
 	</style>
 	</head>
 	<body>
+    <div class="chat-container" id="chat">
+      <div class="message bot"><p>Hello! let's start building.</p></div>
+    </div>
 
-	<div class="chat-container" id="chat">
-		<div class="message bot"><p>Hello! let's start building.</p></div>
-	</div>
+    <div class="ai-toggle-container">
+      <button id="aiToggle" onclick="toggleAI()">🌐 Online AI</button>
+      <!-- 3️⃣ initialize with the current model -->
+      <span id="modelInfo">Using ${currModel}</span>
+    </div>
 
-	<div class="ai-toggle-container">
-		<button id="aiToggle" onclick="toggleAI()">🌐 Online AI</button>
-		<span id="modelInfo">Using OpenAI</span>
-	</div>
+    <div class="input-container">
+      <input type="text" id="userInput" placeholder="Type a message…" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
 
-	<div class="input-container">
-		<input type="text" id="userInput" placeholder="Type a message..." />
-		<button onclick="sendMessage()">Send</button>
-	</div>
+    <script>
+      const vscode = acquireVsCodeApi();
+      const currModel = ${currModelEscaped};
 
-	<script>
-		const vscode = acquireVsCodeApi();
-		const chat = document.getElementById('chat');
-		const input = document.getElementById('userInput');
+      const chat = document.getElementById("chat");
+      const input = document.getElementById("userInput");
+      const toggleBtn = document.getElementById("aiToggle");
+      const info = document.getElementById("modelInfo");
+      window.currentBotOutput = "";
+      let isOfflineMode = false;
 
-		function appendPlainTextMessage(sender, text) {
-			const message = document.createElement('div');
-			message.className = "message " + sender;
-			message.textContent = text;
-			chat.appendChild(message);
-			chat.scrollTop = chat.scrollHeight;
-		}
+      function appendPlainTextMessage(sender, text) {
+        const m = document.createElement("div");
+        m.className = "message " + sender;
+        m.textContent = text;
+        chat.appendChild(m);
+        chat.scrollTop = chat.scrollHeight;
+      }
 
-		function appendHTMLMessage(sender, html) {
-			const message = document.createElement('div');
-			message.className = "message " + sender;
-			message.innerHTML = html;
-			chat.appendChild(message);
-			chat.scrollTop = chat.scrollHeight;
-		}
+      function sendMessage() {
+        const txt = input.value.trim();
+        if (!txt) return;
+        appendPlainTextMessage("user", txt);
+        vscode.postMessage({ type: "userInput", text: txt });
+        input.value = "";
+      }
 
-		function sendMessage() {
-			const text = input.value.trim();
-			if (!text) return;
-			appendPlainTextMessage('user', text);
-			vscode.postMessage({ type: 'userInput', text });
-			input.value = '';
-		}
+      input.addEventListener("keydown", e => e.key === "Enter" && sendMessage());
 
-		input.addEventListener('keydown', e => {
-			if (e.key === 'Enter') sendMessage();
-		});
+      function toggleAI() {
+        vscode.postMessage({ type: "toggleAI" });
+      }
 
-		window.currentBotOutput = '';
-
-		let isOfflineMode = false;
-
-		function toggleAI() {
-			vscode.postMessage({ type: 'toggleAI' });
-		}
-
-		window.addEventListener('message', event => {
-			const message = event.data;
-
-			if (message.type === 'resetBotMessage') {
-				appendPlainTextMessage('bot', '');
-				window.currentBotOutput = '';
-			}
-
-			if (message.type === 'addText') {
-				window.currentBotOutput += message.text;
-
-				const bots = chat.getElementsByClassName('bot');
-				if (bots.length === 0) return;
-				const lastBot = bots[bots.length - 1];
-
-				lastBot.innerHTML = window.currentBotOutput;
-				chat.scrollTop = chat.scrollHeight;
-			}
-
-			if (message.type === 'end') {
-				const bots = chat.getElementsByClassName('bot');
-				if (bots.length === 0) return;
-				const lastBot = bots[bots.length - 1];
-
-				lastBot.innerHTML = window.currentBotOutput;
-				chat.scrollTop = chat.scrollHeight;
-			}
-			if (message.type === 'aiModeChanged') {
-				isOfflineMode = message.isOffline;
-				const button = document.getElementById('aiToggle');
-				const info = document.getElementById('modelInfo');
-				if (isOfflineMode) {
-					button.textContent = '💻 Local AI';
-					info.textContent = 'Using Local Model';
-				} else {
-					button.textContent = '🌐 Online AI';
-					info.textContent = 'Using OpenAI';
-				}
-			}
-		});
-	</script>
-
+      window.addEventListener("message", event => {
+        const msg = event.data;
+        if (msg.type === "resetBotMessage") {
+          appendPlainTextMessage("bot", "");
+          window.currentBotOutput = "";
+        }
+        if (msg.type === "addText" || msg.type === "end") {
+          window.currentBotOutput += msg.text;
+          const bots = chat.getElementsByClassName("bot");
+          bots[bots.length - 1].innerHTML = window.currentBotOutput;
+          chat.scrollTop = chat.scrollHeight;
+        }
+        if (msg.type === "aiModeChanged") {
+          isOfflineMode = msg.isOffline;
+          if (isOfflineMode) {
+            toggleBtn.textContent = "💻 Local AI";
+            info.textContent = "Using " + msg.modelName;
+          } else {
+            toggleBtn.textContent = "🌐 Online AI";
+            info.textContent = "Using OpenAI";
+          }
+        }
+      });
+    </script>
 	</body>
 	</html>`;
 }

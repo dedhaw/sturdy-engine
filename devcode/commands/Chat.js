@@ -3,6 +3,8 @@ const OfflineAIClient = require('../ai/OfflineAIClient');
 const OnlineAIClient = require('../ai/OnlineAIClient');
 const { SYSTEM_PROMPTS, createUserMessageWithSystem } = require('../ai/prompts');
 const { getWebviewContent } = require("../components/webViewContent")
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const api = new OnlineAIClient(process.env.OPENAI_API_KEY);
 
