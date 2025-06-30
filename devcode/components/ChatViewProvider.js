@@ -28,6 +28,16 @@ class ChatViewProvider {
 
     webviewView.webview.html = getWebviewContent();
 
+    // const config = vscode.workspace.getConfiguration('devcode');
+    // const isOffline = config.get('useOfflineAI', false);
+    // const ollama = new OfflineAIClient();
+    // const selectedModel = ollama.getSelectedModel() || 'OpenAI';
+    // webviewView.webview.postMessage({
+    //   type: 'aiModeChanged',
+    //   isOffline: isOffline,
+    //   modelName: selectedModel
+    // });
+
     webviewView.webview.postMessage({
       type: 'aiModeChanged',
       isOffline: false,
