@@ -9,19 +9,39 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:devcodeChatView"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "devcode.aiAgent",
-        "title": "DevCode: Activate"
+        "command": "devcode.openChatPanel",
+        "title": "DevCode: Open Chat Panel"
       },
       {
         "command": "devcode.selectAI",
         "title": "DevCode: Select Model"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devcodeSidebar",
+          "title": "DevCode",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "devcodeSidebar": [
+        {
+          "id": "devcodeChatView",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
     "configuration": {
       "title": "DevCode",
       "properties": {
