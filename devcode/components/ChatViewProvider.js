@@ -14,6 +14,11 @@ class ChatViewProvider {
     this.api = new OnlineAIClient(process.env.OPENAI_API_KEY);
   }
 
+  refresh() {
+    if (this.view) {
+      this.view.webview.html = getWebviewContent()
+    }
+  }
   /**
    * Called by VS Code when the view is created in the sidebar
    * @param {vscode.WebviewView} webviewView
@@ -37,6 +42,7 @@ class ChatViewProvider {
     //   isOffline: isOffline,
     //   modelName: selectedModel
     // });
+    
 
     webviewView.webview.postMessage({
       type: 'aiModeChanged',

@@ -31,6 +31,7 @@ async function selector() {
         if (await ollama.modelExists(model)) {
             vscode.window.showInformationMessage(`Model ${model} is ready!`);
             await ollama.saveSelectedModel(model);
+            await vscode.commands.executeCommand('devcode.refreshChatView');
         } else {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -58,6 +59,7 @@ async function selector() {
                 
                 vscode.window.showInformationMessage(`Successfully downloaded ${model}!`);
                 await ollama.saveSelectedModel(model);
+                await vscode.commands.executeCommand('devcode.refreshChatView');
             });
         }
         
