@@ -10,6 +10,7 @@ function activate(context) {
   console.log('DevCode extension is now active!');
 
   const provider = new ChatViewProvider(context);
+  
   const viewProviderDisposable = vscode.window.registerWebviewViewProvider(
     'devcodeChatView',
     provider,
@@ -19,6 +20,13 @@ function activate(context) {
       } 
     }
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'devcode.refreshChatView',
+      () => provider.refresh()
+    )
+  )
 
   const select = vscode.commands.registerCommand('devcode.selectAI', selector);
   const aiAgentCommand = vscode.commands.registerCommand('devcode.aiAgent', () => {
