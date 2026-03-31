@@ -14,7 +14,7 @@ const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 const client = new BackendClient();
 
-// Shared state for Ctrl+C
+let lastCtrlC = 0;
 function checkDoubleTapExit() {
   const now = Date.now();
   if (now - lastCtrlC < 1000) {

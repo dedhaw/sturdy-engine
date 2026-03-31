@@ -4,7 +4,7 @@ class BackendClient {
   }
 
   async chatCompletion(messages, onToken, options = {}) {
-    const { provider = 'openai', model = null, stream = true } = options;
+    const { provider = 'openai', model = null, stream = true, session_id = 'default', repoStructure = null } = options;
 
     try {
       const response = await fetch(`${this.baseUrl}/chat`, {
@@ -16,7 +16,9 @@ class BackendClient {
           messages,
           provider,
           model,
-          stream
+          stream,
+          session_id,
+          repo_structure: repoStructure
         }),
       });
 

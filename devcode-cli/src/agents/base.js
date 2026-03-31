@@ -11,7 +11,7 @@ class BaseAgent {
     ];
 
     try {
-      // client.chatCompletion should handle provider/model in options
+      // client.chatCompletion should handle provider/model/repoStructure in options
       return await this.client.chatCompletion(messages, onToken, options);
     } catch (error) {
       console.error(`Error in ${this.name}:`, error);

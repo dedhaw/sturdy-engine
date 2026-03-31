@@ -4,11 +4,14 @@ const ChatAgent = require('../agents/chat_agent');
 const { loadConfig } = require('../utils/config');
 const { formatMarkdown } = require('../utils/formatter');
 const { handleInChatCommand } = require('../utils/command_handler');
+const { getRepoStructure } = require('../utils/repo_explorer');
 
 async function handleChat(client, cmd, checkDoubleTapExit) {
   const config = loadConfig();
   const provider = cmd.provider || config.provider || 'openai';
   const model = cmd.model || config.model || (provider === 'openai' ? 'gpt-4o' : null);
+  
+  const repoStructure = getRepoStructure(process.cwd());
   
   const agent = new ChatAgent(client);
   const history = [];
@@ -77,10 +80,9 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
         });
         
         lastLineCount = currentLineCount - 1;
-      }, { provider: activeProvider, model: activeModel });
-      
-      process.stdout.write('\n\n');
-      
+        }, { provider: activeProvider, model: activeModel, repoStructure });
+
+        process.stdout.write('\n\n');      
       history.push({ role: 'user', content: input });
       history.push({ role: 'assistant', content: fullResponse });
       
