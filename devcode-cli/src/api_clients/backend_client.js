@@ -1,5 +1,5 @@
 class BackendClient {
-  constructor(baseUrl = 'http://localhost:8040') {
+  constructor(baseUrl = 'http://localhost:8040/api') {
     this.baseUrl = baseUrl;
   }
 

@@ -12,9 +12,9 @@ const { handleChat } = require('./commands/chat');
 const packagePath = path.join(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
-const client = new BackendClient('http://localhost:8040');
+const client = new BackendClient();
 
-let lastCtrlC = 0;
+// Shared state for Ctrl+C
 function checkDoubleTapExit() {
   const now = Date.now();
   if (now - lastCtrlC < 1000) {
