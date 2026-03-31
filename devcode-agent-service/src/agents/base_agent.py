@@ -8,6 +8,10 @@ class BaseAgent:
         self.openai = OpenAIClient()
         self.ollama = OllamaClient()
 
+    def log(self, tag, message):
+        if os.getenv("APP_MODE") == "True":
+            print(f"[{tag}] {message}")
+
     def get_system_prompt(self):
         # This will be overridden by subclasses or loaded from their specific prompts.py
         return "You are a helpful AI assistant."

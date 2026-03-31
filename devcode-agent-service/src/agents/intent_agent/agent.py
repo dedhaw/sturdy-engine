@@ -15,6 +15,8 @@ class IntentAgent(BaseAgent):
         async for token in self.run(messages, provider=provider, model=model, stream=True):
             full_response += token
             
+        self.log("intent_agent", f"Analysis: {full_response}")
+
         try:
             json_match = re.search(r'\{.*\}', full_response, re.DOTALL)
             if json_match:
