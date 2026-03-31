@@ -5,6 +5,7 @@ const prompts = require('prompts');
 const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
+const readline = require('readline');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const BackendClient = require('./api_clients/backend_client');
@@ -246,6 +247,8 @@ program
       process.stdout.write(chalk.cyan('Bot: '));
       
       let fullResponse = '';
+      let lastLineCount = 0;
+
       try {
         // Use current selection for this turn
         const currentConfig = loadConfig();
@@ -253,21 +256,32 @@ program
         const activeModel = cmd.model || currentConfig.model || model;
 
         await agent.run(input, history, (token) => {
-          process.stdout.write(token);
           fullResponse += token;
+          
+          const formatted = formatMarkdown(fullResponse);
+          
+          // Move cursor up by lastLineCount
+          if (lastLineCount > 0) {
+            readline.moveCursor(process.stdout, 0, -lastLineCount);
+            readline.clearScreenDown(process.stdout);
+          }
+          
+          process.stdout.write(formatted);
+          
+          // Calculate new line count
+          // We need to account for wrapping
+          const lines = formatted.split('\n');
+          let count = 0;
+          const cols = process.stdout.columns || 80;
+          lines.forEach(line => {
+            // Very basic wrap calculation
+            const lineLength = line.replace(/\u001b\[[0-9;]*m/g, '').length;
+            count += Math.max(1, Math.ceil(lineLength / cols));
+          });
+          lastLineCount = count - 1; // -1 because we're already on the first line
         }, { provider: activeProvider, model: activeModel });
         
-        // Clear the streamed lines and re-render with formatting
-        // A simple way is to print a few newlines and then the formatted version
-        process.stdout.write('\n');
-        
-        // Clear screen logic is tricky in CLI without libraries, 
-        // so we just reprint the formatted version if it has markdown features
-        if (fullResponse.includes('```') || fullResponse.includes('**') || fullResponse.includes('#')) {
-          console.log(chalk.gray('--- Formatted Output ---'));
-          console.log(formatMarkdown(fullResponse));
-          console.log(chalk.gray('------------------------'));
-        }
+        process.stdout.write('\n\n');
         
         // Add to history
         history.push({ role: 'user', content: input });
