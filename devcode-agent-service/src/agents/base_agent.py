@@ -9,7 +9,7 @@ class BaseAgent:
         self.ollama = OllamaClient()
 
     def log(self, tag, message):
-        if os.getenv("APP_MODE") == "True":
+        if os.getenv("APP_MODE") == "dev":
             print(f"[{tag}] {message}")
 
     def get_system_prompt(self):

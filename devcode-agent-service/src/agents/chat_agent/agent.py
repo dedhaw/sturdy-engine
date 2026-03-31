@@ -20,6 +20,7 @@ class ChatAgent(BaseAgent):
         return prompt
 
     async def run(self, messages, session_id="default", provider="openai", model=None, stream=True, repo_structure=None, base_path=None):
+        self.log("chat_agent", f"Run called with repo_structure={'Yes' if repo_structure else 'No'}, base_path={base_path}")
         if session_id not in self.sessions:
             self.sessions[session_id] = ContextManager(max_context=15)
         
