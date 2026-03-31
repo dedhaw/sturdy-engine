@@ -30,6 +30,21 @@ class OllamaClient:
             except Exception as e:
                 yield f"Error: {str(e)}"
 
+    async def pull_model(self, model_name):
+        async with httpx.AsyncClient(timeout=None) as client:
+            try:
+                payload = {"name": model_name, "stream": True}
+                async with client.stream("POST", f"{self.base_url}/api/pull", json=payload) as response:
+                    if response.status_code != 200:
+                        yield json.dumps({"status": "error", "message": f"Ollama returned status {response.status_code}"})
+                        return
+
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line
+            except Exception as e:
+                yield json.dumps({"status": "error", "message": str(e)})
+
     async def get_models(self):
         async with httpx.AsyncClient() as client:
             try:

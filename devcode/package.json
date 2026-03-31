@@ -1,8 +1,8 @@
 {
   "name": "devcode",
   "displayName": "devcode",
-  "description": "",
-  "version": "0.0.1",
+  "description": "AI-powered coding assistant using a local Python backend.",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -16,12 +16,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "devcode.openChatPanel",
-        "title": "DevCode: Open Chat Panel"
-      },
-      {
-        "command": "devcode.selectAI",
-        "title": "DevCode: Select Model"
+        "command": "devcode.aiAgent",
+        "title": "DevCode: Open Chat Sidebar"
       }
     ],
     "viewsContainers": {
@@ -47,7 +43,7 @@
       "properties": {
         "devcode.selectedModel": {
           "type": "string",
-          "default": "",
+          "default": "gpt-4o-mini",
           "description": "Currently selected AI model for DevCode extension"
         },
         "devcode.useOfflineAI": {
@@ -70,9 +66,5 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.25.1"
-  },
-  "dependencies": {
-    "dotenv": "^16.5.0",
-    "openai": "^5.0.2"
   }
 }

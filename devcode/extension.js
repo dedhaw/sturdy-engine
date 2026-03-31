@@ -1,7 +1,5 @@
 const vscode = require('vscode');
 const ChatViewProvider = require('./components/ChatViewProvider');
-const { selector } = require('./commands/SelectAI');
-const chat = require('./commands/Chat'); // Import the chat command
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -28,9 +26,7 @@ function activate(context) {
     )
   )
 
-  const select = vscode.commands.registerCommand('devcode.selectAI', selector);
   const aiAgentCommand = vscode.commands.registerCommand('devcode.aiAgent', () => {
-
     if (provider.isVisible()) {
       vscode.window.showInformationMessage('DevCode is already active in the sidebar!');
     } else {
@@ -38,13 +34,9 @@ function activate(context) {
     }
   });
 
-  const openChatPanelCommand = vscode.commands.registerCommand('devcode.openChatPanel', chat);
-
   context.subscriptions.push(
     viewProviderDisposable,
-    select,
-    aiAgentCommand,
-    openChatPanelCommand
+    aiAgentCommand
   );
 }
 
