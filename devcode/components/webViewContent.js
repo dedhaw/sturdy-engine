@@ -143,12 +143,23 @@ function getWebviewContent() {
 			font-size: 12px;
 			color: #999;
 		}
+
+		.status-indicator {
+			font-size: 12px;
+			font-style: italic;
+			color: #aaa;
+			margin-bottom: 8px;
+			padding: 0 16px;
+			display: none;
+		}
 	</style>
 	</head>
 	<body>
     <div class="chat-container" id="chat">
       <div class="message bot"><p>Hello! let's start building.</p></div>
     </div>
+
+    <div id="statusIndicator" class="status-indicator">Thinking...</div>
 
     <div class="ai-toggle-container">
       <button id="aiToggle" onclick="toggleAI()">🌐 Online AI</button>
@@ -196,14 +207,35 @@ function getWebviewContent() {
 
       window.addEventListener("message", event => {
         const msg = event.data;
+        const statusIndicator = document.getElementById("statusIndicator");
+
+        if (msg.type === "status") {
+          statusIndicator.style.display = "block";
+          statusIndicator.textContent = msg.text;
+        }
         if (msg.type === "resetBotMessage") {
           appendPlainTextMessage("bot", "");
           window.currentBotOutput = "";
+          statusIndicator.style.display = "none";
         }
         if (msg.type === "addText" || msg.type === "end") {
+          statusIndicator.style.display = "none";
           window.currentBotOutput += msg.text;
           const bots = chat.getElementsByClassName("bot");
           bots[bots.length - 1].innerHTML = window.currentBotOutput;
+          chat.scrollTop = chat.scrollHeight;
+        }
+        if (msg.type === "showPlan") {
+          statusIndicator.style.display = "none";
+          const m = document.createElement("div");
+          m.className = "message bot plan-message";
+          let planHtml = "<strong>Implementation Plan:</strong><ul>";
+          msg.steps.forEach(step => {
+            planHtml += \`<li>\${step.description}</li>\`;
+          });
+          planHtml += "</ul><p>Ready to proceed?</p>";
+          m.innerHTML = planHtml;
+          chat.appendChild(m);
           chat.scrollTop = chat.scrollHeight;
         }
         if (msg.type === "aiModeChanged") {

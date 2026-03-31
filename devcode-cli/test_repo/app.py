@@ -1,78 +1,44 @@
-# test_repo/app.py
+from typing import List
 
-import sys
-import logging
-from pathlib import Path
-from typing import Optional, List
-import typer
-from dataclasses import dataclass
-
-# 1. Setup Logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
-
-# 2. Domain Exceptions
-class CLIError(Exception):
-    """Base exception for this tool."""
-    pass
-
-class ProcessingError(CLIError):
-    """Raised when data transformation fails."""
-    pass
-
-# 3. Core Logic (Interface Agnostic)
-def transform_data(input_file: Path, uppercase: bool = False) -> str:
+def two_sum(nums: List[int], target: int) -> List[int]:
     """
-    Reads a file and applies transformations.
+    Finds two numbers in the list 'nums' that add up to the 'target'.
     
     Args:
-        input_file: Path to the target file.
-        uppercase: Whether to shout the output.
+        nums (List[int]): A list of integers.
+        target (int): The target sum.
         
     Returns:
-        The transformed string content.
+        List[int]: A list containing the indices of the two numbers that add up to the target.
         
     Raises:
-        ProcessingError: If the file cannot be read.
+        ValueError: If no two numbers add up to the target.
     """
+    num_to_index = {}
+    
+    for index, number in enumerate(nums):
+        complement = target - number
+        if complement in num_to_index:
+            return [num_to_index[complement], index]
+        num_to_index[number] = index
+    
+    raise ValueError("No two numbers add up to the target")
+
+# --- ADDED TEST FUNCTION ---
+def test_two_sum():
+    """
+    Test the two_sum function with sample input.
+    """
+    nums = [2, 7, 11, 15]
+    target = 9
+    expected_output = [0, 1]
+    
     try:
-        if not input_file.exists():
-            raise FileNotFoundError(f"File not found: {input_file}")
-            
-        content = input_file.read_text(encoding="utf-8")
-        return content.upper() if uppercase else content
-    except Exception as e:
-        logger.debug(f"Traceback: {e}")
-        raise ProcessingError(f"Failed to process {input_file}: {e}")
-
-# 4. CLI Interface
-app = typer.Typer(
-    help="Architect-level Python CLI Template",
-    add_completion=False,
-    rich_markup_mode="rich"
-)
-
-@app.command()
-def process(
-    path: Path = typer.Argument(..., help="Path to the input file"),
-    shout: bool = typer.Option(False, "--shout", "-s", help="Convert output to uppercase"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging")
-):
-    """Execute the file processing pipeline."""
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-        
-    try:
-        result = transform_data(path, uppercase=shout)
-        typer.echo(result)
-    except CLIError as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1)
-
-@app.command()
-def hello():
-    """Prints a hello world message."""
-    logger.info("Hello, World!")
+        result = two_sum(nums, target)
+        assert result == expected_output, f"Expected {expected_output}, but got {result}"
+        print("Test passed.")
+    except ValueError as e:
+        print(f"Test failed: {e}")
 
 if __name__ == "__main__":
-    app()
+    test_two_sum()

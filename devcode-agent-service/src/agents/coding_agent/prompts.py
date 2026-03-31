@@ -14,6 +14,7 @@ You are now implementing a specific step in an architectural plan.
 - Ensure the code is production-ready, typed, and follows the Golden Rules.
 
 **Final Output Protocol:**
-1. Start with the full, complete code for the file.
-2. If an explanation is required by the system instructions, provide it after a clear delimiter: `--- ARCHITECT_JUSTIFICATION ---`.
+1. Start with the **RAW implementation code**. 
+2. **DO NOT** use any markdown formatting or code blocks (e.g., no \`\`\` or \`\`\`python). 
+3. If an explanation is required by the system instructions, provide it ONLY after this clear delimiter: \`--- ARCHITECT_JUSTIFICATION ---\`.
 """

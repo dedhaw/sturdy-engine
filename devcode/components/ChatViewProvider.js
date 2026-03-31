@@ -95,8 +95,14 @@ class ChatViewProvider {
     };
     
     try {
-      await this.api.chatCompletion(messages, (token) => {
-        webviewView.webview.postMessage({ type: 'addText', text: token });
+      await this.api.chatCompletion(messages, (data) => {
+        if (data.type === 'status') {
+          webviewView.webview.postMessage({ type: 'status', text: data.content });
+        } else if (data.type === 'chunk') {
+          webviewView.webview.postMessage({ type: 'addText', text: data.content });
+        } else if (data.type === 'plan') {
+          webviewView.webview.postMessage({ type: 'showPlan', steps: data.steps });
+        }
       }, options);
     } catch (error) {
       webviewView.webview.postMessage({ type: 'addText', text: `<p style="color: red;">Error: ${error.message}. Is the backend running at http://localhost:8040?</p>` });

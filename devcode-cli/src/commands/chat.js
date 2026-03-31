@@ -61,6 +61,8 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
 
     process.stdout.write(chalk.cyan('Bot: '));
 
+    const modifiedFiles = new Map();
+
     try {
       const activeProvider = (loadConfig()).provider || provider;
       const activeModel = (loadConfig()).model || model;
@@ -69,7 +71,16 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
       await agent.run(input, history, (data) => {
         if (isInterrupted) return;
 
+        if (data.type === 'status') {
+          readline.cursorTo(process.stdout, 0);
+          readline.clearLine(process.stdout, 0);
+          process.stdout.write(chalk.gray(`[Thinking: ${data.content}]`));
+          return;
+        }
+
         if (data.type === 'plan') {
+          readline.cursorTo(process.stdout, 0);
+          readline.clearLine(process.stdout, 0);
           currentPlan = data.steps;
           process.stdout.write(chalk.yellow('\n\nImplementation Plan Generated:\n'));
           currentPlan.forEach(s => {
@@ -79,6 +90,11 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
         }
 
         if (data.type === 'chunk') {
+          if (fullResponse === '') {
+            readline.cursorTo(process.stdout, 0);
+            readline.clearLine(process.stdout, 0);
+            process.stdout.write(chalk.cyan('Bot: '));
+          }
           fullResponse += data.content;
           const formatted = formatMarkdown(fullResponse);
           if (lastLineCount > 0) {
@@ -121,21 +137,21 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
           if (response.action === 'abort') break;
           if (response.action === 'skip') continue;
           if (response.action === 'approve') {
-            console.log(chalk.blue(`Executing: ${step.file_path}...`));
+            const filePath = step.file_path || (step.metadata && step.metadata.file_path);
+            process.stdout.write(chalk.gray(`[Thinking: Implementing changes in ${filePath}...]`));
+            
             const result = await client.approveStep(sessionId, step.id, process.cwd(), {
               provider: (loadConfig()).provider || provider,
               model: (loadConfig()).model || model,
               repoStructure: getRepoStructure(process.cwd())
             });
 
+            readline.cursorTo(process.stdout, 0);
+            readline.clearLine(process.stdout, 0);
+
             if (result.status === 'success') {
-              console.log(chalk.green('✔ Done.'));
-              if (result.code) {
-                console.log(chalk.gray('--- Changes ---'));
-                const preview = result.code.split('\n').slice(0, 10).join('\n');
-                console.log(chalk.cyan(preview) + (result.code.split('\n').length > 10 ? '\n...' : ''));
-                console.log(chalk.gray('---------------'));
-              }
+              console.log(chalk.green(`✔ Done. ${filePath} updated.`));
+              modifiedFiles.set(filePath, result.code);
             } else {
               console.log(chalk.red(`✘ Failed: ${result.message}`));
             }
@@ -144,10 +160,31 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
         rl.resume();
         // Final Summary
         console.log(chalk.blue('\nAll steps processed. Summary:'));
+        process.stdout.write(chalk.gray('[Thinking: Summarizing changes...]'));
+        
+        let summaryResponse = '';
         await agent.run("Summarize the changes made in this session.", history, (data) => {
-          if (data.type === 'chunk') process.stdout.write(data.content);
+          if (data.type === 'chunk') {
+            if (summaryResponse === '') {
+              readline.cursorTo(process.stdout, 0);
+              readline.clearLine(process.stdout, 0);
+              process.stdout.write(chalk.cyan('Bot: '));
+            }
+            summaryResponse += data.content;
+            process.stdout.write(data.content);
+          }
         }, { session_id: sessionId });
         process.stdout.write('\n\n');
+
+        if (modifiedFiles.size > 0) {
+          console.log(chalk.blue('--- Final Changes ---'));
+          for (const [path, code] of modifiedFiles) {
+            const ext = path.split('.').pop();
+            const markdown = `**File: \`${path}\`**\n\`\`\`${ext}\n${code}\n\`\`\``;
+            console.log(formatMarkdown(markdown));
+          }
+          console.log(chalk.blue('----------------------\n'));
+        }
       }
 
       if (fullResponse) {
