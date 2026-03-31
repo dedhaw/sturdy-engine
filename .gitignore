@@ -1,1 +1,3 @@
 .env
+devcode-agent-service/bin/
+.gemini
