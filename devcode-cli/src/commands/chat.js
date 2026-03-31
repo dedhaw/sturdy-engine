@@ -22,7 +22,7 @@ async function handleChat(client, cmd) {
 
   while (true) {
     const input = await clackText({
-      message: chalk.cyan('*'),
+      message: chalk.cyan('❯'),
       placeholder: 'Type a message or / for commands...',
       validate: (value) => {
         if (!value) return 'Please enter a message';
@@ -68,11 +68,8 @@ async function handleChat(client, cmd) {
     }
 
     const mockRl = { 
-        close: () => {}, 
-        pause: () => {}, 
-        resume: () => {},
-        setPrompt: () => {},
-        prompt: () => {}
+        close: () => {}, pause: () => {}, resume: () => {},
+        setPrompt: () => {}, prompt: () => {}
     };
     
     const handled = await handleInChatCommand(finalInput, client, mockRl);
@@ -93,14 +90,13 @@ async function handleChat(client, cmd) {
         if (data.type === 'status') {
           s.message(`${chalk.gray('[')}${chalk.cyan(data.content)}${chalk.gray(']')}`);
         } else if (data.type === 'plan') {
-          s.stop(chalk.green('Implementation plan generated'));
+          s.stop(chalk.green('Plan generated'));
           currentPlan = data.steps;
           let planText = '';
           currentPlan.forEach(step => {
             planText += `${chalk.yellow('•')} ${step.description}\n`;
           });
           note(planText.trim(), chalk.bold.yellow('Implementation Plan'));
-          s.start('Waiting for step approval...');
         } else if (data.type === 'chunk') {
           if (fullResponse === '') {
             s.stop(chalk.green('Response Ready'));
@@ -120,12 +116,16 @@ async function handleChat(client, cmd) {
         session_id: sessionId 
       });
 
+      // Ensure the initial spinner is stopped before moving on
+      s.stop('Thinking complete');
+
       if (fullResponse) {
         process.stdout.write('\n' + chalk.blue('└') + '─'.repeat(50) + '\n\n');
         history.push({ role: 'user', content: finalInput });
         history.push({ role: 'assistant', content: fullResponse });
       }
 
+      // Approval Loop
       if (currentPlan) {
         for (const step of currentPlan) {
           const action = await clackSelect({
@@ -160,15 +160,18 @@ async function handleChat(client, cmd) {
           }
         }
 
+        // Final Summary
         log.step('Finalizing session...');
         const summarySpinner = spinner();
         summarySpinner.start('Summarizing changes...');
         let summaryResponse = '';
         
         await agent.run("Summarize the changes made in this session.", history, (data) => {
-          if (data.type === 'chunk') {
+          if (data.type === 'status') {
+            summarySpinner.message(`${chalk.gray('[')}${chalk.cyan(data.content)}${chalk.gray(']')}`);
+          } else if (data.type === 'chunk') {
             if (summaryResponse === '') {
-              summarySpinner.stop(chalk.green('Summary:'));
+              summarySpinner.stop(chalk.green('Summary Ready'));
               process.stdout.write(chalk.blue('┌  ') + chalk.bold('Session Summary') + '\n');
               process.stdout.write(chalk.blue('│  '));
             }
@@ -178,6 +181,8 @@ async function handleChat(client, cmd) {
           }
         }, { session_id: sessionId });
         
+        // Ensure the summary spinner is stopped
+        summarySpinner.stop('Summary complete');
         process.stdout.write('\n' + chalk.blue('└') + '─'.repeat(50) + '\n\n');
 
         if (modifiedFiles.size > 0) {
