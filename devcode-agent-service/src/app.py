@@ -66,17 +66,28 @@ async def get_installed_models():
 
 @app.get("/models/available")
 async def get_available_models():
-    return {
-        "models": [
-            {"name": "llama3.2", "description": "Meta's lightweight 3.2B model"},
-            {"name": "deepseek-r1:7b", "description": "DeepSeek's powerful 7B reasoning model"},
-            {"name": "deepseek-r1:14b", "description": "DeepSeek's advanced 14B reasoning model"},
-            {"name": "codellama", "description": "Meta's specialized code model"},
-            {"name": "mistral", "description": "Fast and efficient general-purpose model"},
-            {"name": "phi3", "description": "Microsoft's compact high-performance model"},
-            {"name": "qwen2.5-coder:7b", "description": "Alibaba's specialized 7B code model"}
-        ]
-    }
+    # 1. Try scraping first for real-time data
+    remote_models = await ollama_client.get_remote_models()
+    
+    # 2. Load static catalog as fallback/supplement
+    catalog_path = os.path.join(os.path.dirname(__file__), "utils", "catalog.json")
+    catalog_models = []
+    try:
+        if os.path.exists(catalog_path):
+            with open(catalog_path, "r") as f:
+                catalog = json.load(f)
+                catalog_models = catalog.get("models", [])
+    except Exception as e:
+        print(f"Error loading catalog: {e}")
+
+    # 3. Combine and de-duplicate (prefer scraped description)
+    seen_names = {m["name"] for m in remote_models}
+    for m in catalog_models:
+        if m["name"] not in seen_names:
+            remote_models.append(m)
+            seen_names.add(m["name"])
+            
+    return {"models": remote_models}
 
 @app.post("/models/install")
 async def install_model(request: ModelInstallRequest):
