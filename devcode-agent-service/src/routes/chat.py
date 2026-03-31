@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
     provider: Optional[str] = "openai"
     session_id: Optional[str] = "default"
     repo_structure: Optional[str] = None
+    base_path: Optional[str] = None
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
@@ -31,7 +32,8 @@ async def chat(request: ChatRequest):
             provider=request.provider,
             model=request.model,
             stream=request.stream,
-            repo_structure=request.repo_structure
+            repo_structure=request.repo_structure,
+            base_path=request.base_path
         ), 
         media_type="text/plain"
     )

@@ -10,9 +10,7 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
   const config = loadConfig();
   const provider = cmd.provider || config.provider || 'openai';
   const model = cmd.model || config.model || (provider === 'openai' ? 'gpt-4o' : null);
-  
   const repoStructure = getRepoStructure(process.cwd());
-  
   const agent = new ChatAgent(client);
   const history = [];
 
@@ -48,7 +46,6 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
     if (handled) continue;
 
     process.stdout.write(chalk.cyan('Bot: '));
-    
     let fullResponse = '';
     let lastLineCount = 0;
 
@@ -66,7 +63,6 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
         }
         readline.cursorTo(process.stdout, 5);
         readline.clearScreenDown(process.stdout);
-        
         process.stdout.write(formatted);
         
         const cols = process.stdout.columns || 80;
@@ -80,9 +76,9 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
         });
         
         lastLineCount = currentLineCount - 1;
-        }, { provider: activeProvider, model: activeModel, repoStructure });
-
-        process.stdout.write('\n\n');      
+      }, { provider: activeProvider, model: activeModel, repoStructure, basePath: process.cwd() });
+      
+      process.stdout.write('\n\n');
       history.push({ role: 'user', content: input });
       history.push({ role: 'assistant', content: fullResponse });
       
@@ -91,7 +87,6 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
       }
     } catch (error) {
       console.error(chalk.red('\nError: ' + error.message));
-      console.log(chalk.yellow('Make sure the backend is running at http://localhost:8040'));
     }
   }
 }
