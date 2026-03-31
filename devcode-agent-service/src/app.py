@@ -9,7 +9,7 @@ import os
 import signal
 import sys
 
-from agents.chat_agent import ChatAgent
+from agents.chat_agent.agent import ChatAgent
 from api_clients.ollama import OllamaClient
 from utils.ollama_manager import OllamaManager
 

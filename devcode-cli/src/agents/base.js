@@ -4,13 +4,8 @@ class BaseAgent {
     this.name = name;
   }
 
-  getSystemPrompt() {
-    return "You are a helpful AI assistant.";
-  }
-
   async run(userInput, history = [], onToken = null, options = {}) {
     const messages = [
-      { role: "system", content: this.getSystemPrompt() },
       ...history,
       { role: "user", content: userInput }
     ];
