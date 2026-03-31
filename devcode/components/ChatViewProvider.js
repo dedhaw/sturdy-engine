@@ -1,17 +1,14 @@
 const vscode = require('vscode');
 const { getWebviewContent } = require('../components/webViewContent');
-const OfflineAIClient = require('../ai/OfflineAIClient');
-const OnlineAIClient = require('../ai/OnlineAIClient');
+const BackendClient = require('../ai/BackendClient');
 const { SYSTEM_PROMPTS, createUserMessageWithSystem } = require('../ai/prompts');
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 class ChatViewProvider {
   /** @param {vscode.ExtensionContext} context */
   constructor(context) {
     this.context = context;
     this.view = null;
-    this.api = new OnlineAIClient(process.env.OPENAI_API_KEY);
+    this.api = new BackendClient('http://localhost:8040');
   }
 
   refresh() {
@@ -19,10 +16,7 @@ class ChatViewProvider {
       this.view.webview.html = getWebviewContent()
     }
   }
-  /**
-   * Called by VS Code when the view is created in the sidebar
-   * @param {vscode.WebviewView} webviewView
-   */
+
   resolveWebviewView(webviewView, context, token) {
     this.view = webviewView;
     
@@ -33,21 +27,14 @@ class ChatViewProvider {
 
     webviewView.webview.html = getWebviewContent();
 
-    // const config = vscode.workspace.getConfiguration('devcode');
-    // const isOffline = config.get('useOfflineAI', false);
-    // const ollama = new OfflineAIClient();
-    // const selectedModel = ollama.getSelectedModel() || 'OpenAI';
-    // webviewView.webview.postMessage({
-    //   type: 'aiModeChanged',
-    //   isOffline: isOffline,
-    //   modelName: selectedModel
-    // });
-    
+    const config = vscode.workspace.getConfiguration('devcode');
+    const isOffline = config.get('useOfflineAI', false);
+    const selectedModel = config.get('selectedModel', 'OpenAI');
 
     webviewView.webview.postMessage({
       type: 'aiModeChanged',
-      isOffline: false,
-      modelName: 'OpenAI'
+      isOffline: isOffline,
+      modelName: isOffline ? selectedModel : 'OpenAI'
     });
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -62,19 +49,17 @@ class ChatViewProvider {
         vscode.window.showErrorMessage(`DevCode Error: ${error.message}`);
       }
     });
-
-    webviewView.onDidChangeVisibility(() => {
-      if (webviewView.visible) {
-        console.log('DevCode chat view is now visible');
-      }
-    });
   }
 
   async handleToggleAI(webviewView) {
-    const ollama = new OfflineAIClient();
-    const selectedModel = ollama.getSelectedModel();
+    const config = vscode.workspace.getConfiguration('devcode');
+    const currentMode = config.get('useOfflineAI', false);
+    const selectedModel = config.get('selectedModel');
     
-    if (!selectedModel) {
+    // Toggle first
+    const nextMode = !currentMode;
+    
+    if (nextMode && !selectedModel) {
       const result = await vscode.window.showWarningMessage(
         'No local model selected. Would you like to select one?', 
         'Select Model', 'Cancel'
@@ -85,14 +70,12 @@ class ChatViewProvider {
       return;
     }
     
-    const config = vscode.workspace.getConfiguration('devcode');
-    const currentMode = config.get('useOfflineAI', false);
-    await config.update('useOfflineAI', !currentMode, vscode.ConfigurationTarget.Global);
+    await config.update('useOfflineAI', nextMode, vscode.ConfigurationTarget.Global);
     
     webviewView.webview.postMessage({ 
       type: 'aiModeChanged', 
-      isOffline: !currentMode,
-      modelName: selectedModel
+      isOffline: nextMode,
+      modelName: nextMode ? selectedModel : 'OpenAI'
     });
   }
 
@@ -104,21 +87,19 @@ class ChatViewProvider {
     
     const config = vscode.workspace.getConfiguration('devcode');
     const useOfflineAI = config.get('useOfflineAI', false);
+    const selectedModel = config.get('selectedModel');
     
-    console.log('Using offline AI:', useOfflineAI);
+    const options = {
+      provider: useOfflineAI ? 'ollama' : 'openai',
+      model: useOfflineAI ? selectedModel : null
+    };
     
-    if (useOfflineAI) {
-      const ollama = new OfflineAIClient();
-      console.log('Starting ollama chat completion');
-      await ollama.chatCompletion(messages, (token) => {
-        console.log('Received token from ollama:', token);
-        webviewView.webview.postMessage({ type: 'addText', text: token });
-      });
-      console.log('Ollama chat completion finished');
-    } else {
+    try {
       await this.api.chatCompletion(messages, (token) => {
         webviewView.webview.postMessage({ type: 'addText', text: token });
-      });
+      }, options);
+    } catch (error) {
+      webviewView.webview.postMessage({ type: 'addText', text: `<p style="color: red;">Error: ${error.message}. Is the backend running at http://localhost:8040?</p>` });
     }
   }
 

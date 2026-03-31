@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const OpenAIClient = require('./api_clients/openai');
+const BackendClient = require('./api_clients/backend_client');
 const ChatAgent = require('./agents/chat_agent');
 
 // Basic package.json info
@@ -15,28 +15,24 @@ const packagePath = path.join(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 program
-  .name('devcode-cli')
+  .name('devcode')
   .description('A CLI tool for AI-powered coding assistance')
   .version(packageJson.version);
 
 program
   .command('chat')
   .description('Start an interactive chat with the AI')
-  .action(async () => {
-    const apiKey = process.env.OPENAI_API_KEY;
+  .option('-p, --provider <provider>', 'AI provider to use (openai or ollama)', 'openai')
+  .option('-m, --model <model>', 'Specific model to use')
+  .action(async (cmd) => {
+    const { provider, model } = cmd;
     
-    if (!apiKey || apiKey === 'your_api_key_here') {
-      console.error(chalk.red('Error: OPENAI_API_KEY not found or not set in .env file.'));
-      console.log('Please update the .env file in the devcode_cli directory with your API key:');
-      console.log('OPENAI_API_KEY=sk-...');
-      process.exit(1);
-    }
-
-    const client = new OpenAIClient(apiKey);
+    // We connect to the backend on port 8040
+    const client = new BackendClient('http://localhost:8040');
     const agent = new ChatAgent(client);
     const history = [];
 
-    console.log(chalk.blue('DevCode CLI Chat - Type "exit" to quit'));
+    console.log(chalk.blue(`DevCode CLI Chat (${provider}${model ? ': ' + model : ''}) - Type "exit" to quit`));
 
     while (true) {
       const response = await prompts({
@@ -54,10 +50,12 @@ program
       
       let fullResponse = '';
       try {
+        // We pass provider and model to the agent's run method
         await agent.run(response.userInput, history, (token) => {
           process.stdout.write(token);
           fullResponse += token;
-        });
+        }, { provider, model });
+        
         process.stdout.write('\n');
         
         // Add to history
@@ -70,6 +68,7 @@ program
         }
       } catch (error) {
         console.error(chalk.red('\nError: ' + error.message));
+        console.log(chalk.yellow('Make sure the backend is running at http://localhost:8040'));
       }
     }
   });

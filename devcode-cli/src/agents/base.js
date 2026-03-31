@@ -8,7 +8,7 @@ class BaseAgent {
     return "You are a helpful AI assistant.";
   }
 
-  async run(userInput, history = [], onToken = null) {
+  async run(userInput, history = [], onToken = null, options = {}) {
     const messages = [
       { role: "system", content: this.getSystemPrompt() },
       ...history,
@@ -16,7 +16,8 @@ class BaseAgent {
     ];
 
     try {
-      return await this.client.chatCompletion(messages, onToken);
+      // client.chatCompletion should handle provider/model in options
+      return await this.client.chatCompletion(messages, onToken, options);
     } catch (error) {
       console.error(`Error in ${this.name}:`, error);
       throw error;
