@@ -20,12 +20,19 @@ class CodingAgent(BaseAgent):
                 base_prompt = f"{extra_instructions}\n\n{base_prompt}"
         return base_prompt
 
-    async def generate_code(self, plan, step, file_context, repo_structure, provider="openai", model=None):
+    async def generate_code(self, plan, step, file_context, repo_structure, history=None, provider="openai", model=None):
         file_path = step.get("metadata", {}).get("file_path") if isinstance(step, dict) else None
         
         system_content = self.get_system_prompt(file_path)
         
-        prompt = f"Plan:\n{plan}\n\nStep:\n{step}\n\nContext:\n{file_context}\n\nRepo:\n{repo_structure}"
+        history_text = ""
+        if history:
+            history_text = "Conversation History:\n"
+            for m in history:
+                history_text += f"{m['role'].upper()}: {m['content']}\n"
+            history_text += "\n"
+
+        prompt = f"{history_text}Plan:\n{plan}\n\nStep:\n{step}\n\nContext:\n{file_context}\n\nRepo:\n{repo_structure}"
         
         messages = [
             {"role": "system", "content": system_content},
@@ -40,12 +47,16 @@ class CodingAgent(BaseAgent):
             async for token in self.ollama.chat_completion(messages, model, True):
                 full_response += token
         
-        # Parse the response: Extract code (everything before the delimiter if it exists)
-        code_part = full_response
-        if "--- ARCHITECT_JUSTIFICATION ---" in full_response:
-            code_part = full_response.split("--- ARCHITECT_JUSTIFICATION ---")[0].strip()
+        # Robust Parsing: 
+        # 1. Remove XML-style justifications
+        import re
+        code_part = re.sub(r'<justification>.*?</justification>', '', full_response, flags=re.DOTALL).strip()
         
-        # Strip any markdown code block indicators if the LLM added them despite instructions
+        # 2. Fallback: Remove old-style delimiter if it persists
+        if "--- ARCHITECT_JUSTIFICATION ---" in code_part:
+            code_part = code_part.split("--- ARCHITECT_JUSTIFICATION ---")[0].strip()
+        
+        # 3. Defensive: Strip any markdown code block indicators if the LLM ignored instructions
         if code_part.startswith("```"):
             lines = code_part.splitlines()
             if lines[0].startswith("```"):

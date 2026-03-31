@@ -1,10 +1,12 @@
 # FILE: test_repo/test.py
 
-def hello_world():
-    """
-    Prints a greeting message.
-    """
-    print("Hello, world!")
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def greet(name: str):
+    logger.info(f"Hello, {name}!")
 
 if __name__ == "__main__":
-    hello_world()
+    greet("world")

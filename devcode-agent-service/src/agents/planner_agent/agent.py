@@ -7,11 +7,16 @@ class PlannerAgent(BaseAgent):
     def get_system_prompt(self):
         return PLANNER_PROMPT
 
-    async def create_plan(self, user_query, repo_structure, provider="openai", model=None):
-        prompt = f"User Request: {user_query}\n\nRepository Structure:\n{repo_structure}"
-        messages = [{"role": "user", "content": prompt}]
+    async def create_plan(self, messages, repo_structure, provider="openai", model=None):
+        history_context = ""
+        for m in messages:
+            history_context += f"{m['role'].upper()}: {m['content']}\n"
+
+        prompt = f"Conversation History:\n{history_context}\n\nRepository Structure:\n{repo_structure}"
+        
+        run_messages = [{"role": "user", "content": prompt}]
         full_response = ""
-        async for token in self.run(messages, provider=provider, model=model, stream=True):
+        async for token in self.run(run_messages, provider=provider, model=model, stream=True):
             full_response += token
         try:
             json_match = re.search(r'\[.*\]', full_response, re.DOTALL)

@@ -88,7 +88,7 @@ async function handleChat(client, cmd) {
 
       await agent.run(finalInput, history, (data) => {
         if (data.type === 'status') {
-          s.message(`${chalk.gray('[')}${chalk.cyan(data.content)}${chalk.gray(']')}`);
+          s.message(chalk.cyan(data.content));
         } else if (data.type === 'plan') {
           s.stop(chalk.green('Plan generated'));
           currentPlan = data.steps;
@@ -153,7 +153,7 @@ async function handleChat(client, cmd) {
 
             if (result.status === 'success') {
               execSpinner.stop(chalk.green(`Successfully updated ${filePath}`));
-              modifiedFiles.set(filePath, result.code);
+              modifiedFiles.set(filePath, result);
             } else {
               execSpinner.stop(chalk.red(`Failed to update ${filePath}: ${result.message}`));
             }
@@ -168,7 +168,7 @@ async function handleChat(client, cmd) {
         
         await agent.run("Summarize the changes made in this session.", history, (data) => {
           if (data.type === 'status') {
-            summarySpinner.message(`${chalk.gray('[')}${chalk.cyan(data.content)}${chalk.gray(']')}`);
+            summarySpinner.message(chalk.cyan(data.content));
           } else if (data.type === 'chunk') {
             if (summaryResponse === '') {
               summarySpinner.stop(chalk.green('Summary Ready'));
@@ -186,12 +186,25 @@ async function handleChat(client, cmd) {
         process.stdout.write('\n' + chalk.blue('└') + '─'.repeat(50) + '\n\n');
 
         if (modifiedFiles.size > 0) {
-          let changesText = '';
-          for (const [path, code] of modifiedFiles) {
-            const ext = path.split('.').pop();
-            changesText += `${chalk.bold.cyan(path)}\n${chalk.gray('─'.repeat(path.length))}\n\`\`\`${ext}\n${code}\n\`\`\`\n\n`;
+          console.log('\n' + chalk.bold.white.bgBlue('  REVIEW CHANGES  ') + '\n');
+          for (const [path, data] of modifiedFiles) {
+            const isNew = !data.diff || data.diff.trim() === '';
+            const headerText = isNew ? `[NEW FILE] ${path}` : `[MODIFIED] ${path}`;
+            
+            console.log(chalk.bold.blue(headerText));
+            console.log(chalk.gray('─'.repeat(headerText.length)));
+            
+            let displayCode = data.diff;
+            if (isNew) {
+                // For new files, prepend '+' to each line to make it look like a diff
+                displayCode = data.code.split('\n').map(l => '+' + l).join('\n');
+            }
+            
+            // Print the code without any extra indent bars
+            console.log(formatMarkdown(`\`\`\`diff\n${displayCode}\n\`\`\``));
+            console.log(); // Add spacing between files
           }
-          note(formatMarkdown(changesText.trim()), chalk.bold.blue('Review Changes'));
+          console.log(chalk.bold.blue('─'.repeat(process.stdout.columns || 50)) + '\n');
         }
       }
     } catch (error) {

@@ -9,6 +9,7 @@ from utils.file_reader import read_files_for_context, write_file_content
 from utils.step_tracker import StepTracker, StepStatus
 import os
 import json
+import difflib
 
 class ChatAgent(BaseAgent):
     def __init__(self):
@@ -50,13 +51,15 @@ class ChatAgent(BaseAgent):
             content = last_msg.get('content', '')
             
             if repo_structure and base_path:
-                yield json.dumps({"type": "status", "content": "Classifying intent..."}) + "\n"
-                intent = await self.intent_agent.analyze(content, repo_structure, provider=provider, model=model)
+                yield json.dumps({"type": "status", "content": "Classifying intent"}) + "\n"
+                # Pass managed messages for full context
+                intent = await self.intent_agent.analyze(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                 print(f"[INTENT_AGENT] Result: {json.dumps(intent, indent=2)}")
                 
                 if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
-                    yield json.dumps({"type": "status", "content": "Planning implementation..."}) + "\n"
-                    plan = await self.planner_agent.create_plan(content, repo_structure, provider=provider, model=model)
+                    yield json.dumps({"type": "status", "content": "Planning implementation"}) + "\n"
+                    # Pass managed messages for full context
+                    plan = await self.planner_agent.create_plan(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                     print(f"[PLANNER_AGENT] Plan: {json.dumps(plan, indent=2)}")
                     if plan:
                         new_steps = []
@@ -93,7 +96,7 @@ class ChatAgent(BaseAgent):
         if provider == "ollama":
             self.ollama_manager.start_server()
 
-        yield json.dumps({"type": "status", "content": "Generating response..."}) + "\n"
+        yield json.dumps({"type": "status", "content": "Generating response"}) + "\n"
         full_response = ""
         async for token in super().run(messages=managed_messages, provider=provider, model=model, stream=stream):
             full_response += token
@@ -114,25 +117,54 @@ class ChatAgent(BaseAgent):
         plan = step["metadata"].get("plan")
         file_path = step["metadata"].get("file_path")
         
+        # Read old content for diffing
+        full_path = os.path.join(base_path, file_path)
+        old_code = ""
+        if os.path.exists(full_path):
+            try:
+                with open(full_path, "r", encoding="utf-8") as f:
+                    old_code = f.read()
+            except Exception:
+                pass
+
         print(f"[CODING_AGENT] Reading context for {file_path}")
         file_context = read_files_for_context([file_path], base_path)
         
         print(f"[CODING_AGENT] Generating code...")
-        code = await self.coding_agent.generate_code(
+        cm = self.sessions.get(session_id)
+        history = cm.get_messages() if cm else []
+        
+        new_code = await self.coding_agent.generate_code(
             plan=plan, 
             step=step, 
             file_context=file_context, 
             repo_structure=repo_structure,
+            history=history,
             provider=provider,
             model=model
         )
         
+        # Generate Diff with context
+        diff_list = list(difflib.unified_diff(
+            old_code.splitlines(keepends=True),
+            new_code.splitlines(keepends=True),
+            fromfile=f"a/{file_path}",
+            tofile=f"b/{file_path}",
+            n=3
+        ))
+        diff = "".join(diff_list)
+
         print(f"[CODING_AGENT] Implementation complete. Writing to {file_path}")
-        success = write_file_content(file_path, code, base_path)
+        success = write_file_content(file_path, new_code, base_path)
         if success:
             print(f"[CODING_AGENT] Successfully updated {file_path}")
             tracker.update_step(step_id, StepStatus.COMPLETED)
         else:
             print(f"[CODING_AGENT] Failed to update {file_path}")
             tracker.update_step(step_id, StepStatus.FAILED)
-        return {"status": success, "code": code}
+        
+        return {
+            "status": success, 
+            "code": new_code,
+            "diff": diff
+        }

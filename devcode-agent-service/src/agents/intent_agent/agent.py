@@ -7,12 +7,19 @@ class IntentAgent(BaseAgent):
     def get_system_prompt(self):
         return INTENT_PROMPT
 
-    async def analyze(self, user_query, repo_structure, provider="openai", model=None):
-        prompt = f"User Query: {user_query}\n\nRepository Structure:\n{repo_structure}"
-        messages = [{"role": "user", "content": prompt}]
+    async def analyze(self, messages, repo_structure, provider="openai", model=None):
+        # Create a copy of messages to not modify the original list
+        history_context = ""
+        for m in messages:
+            history_context += f"{m['role'].upper()}: {m['content']}\n"
+
+        prompt = f"Conversation History:\n{history_context}\n\nRepository Structure:\n{repo_structure}"
+        
+        # We use a single-shot prompt for the intent agent with all context
+        run_messages = [{"role": "user", "content": prompt}]
         
         full_response = ""
-        async for token in self.run(messages, provider=provider, model=model, stream=True):
+        async for token in self.run(run_messages, provider=provider, model=model, stream=True):
             full_response += token
             
         self.log("intent_agent", f"Analysis: {full_response}")

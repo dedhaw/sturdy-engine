@@ -10,7 +10,28 @@ function formatMarkdown(text) {
     const header = lang ? chalk.yellow(` code: ${lang} `) : chalk.yellow(' code ');
     const isFinished = end === '```';
     
-    return `\n${border}\n${header}\n${chalk.cyan(code.trim())}${isFinished ? `\n${border}\n` : '\n'}`;
+    let highlightedCode = code.trim();
+    if (lang === 'diff') {
+      highlightedCode = highlightedCode.split('\n').map(line => {
+        if (line.startsWith('+')) {
+          return chalk.greenBright.bold(line);
+        }
+        if (line.startsWith('-')) {
+          return chalk.redBright.bold(line);
+        }
+        if (line.startsWith('@@')) {
+          return chalk.cyanBright(line);
+        }
+        if (line.startsWith('---') || line.startsWith('+++')) {
+          return chalk.gray(line);
+        }
+        return line;
+      }).join('\n');
+    } else {
+      highlightedCode = chalk.cyan(highlightedCode);
+    }
+    
+    return `\n${border}\n${header}\n${highlightedCode}${isFinished ? `\n${border}\n` : '\n'}`;
   });
 
   formatted = formatted.replace(/`([^`\n]+)`/g, (match, code) => {
