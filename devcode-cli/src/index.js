@@ -195,43 +195,44 @@ program
     console.log(chalk.blue(`DevCode CLI Chat (${provider}${model ? ': ' + model : ''})`));
     console.log(chalk.gray('Type "exit" to quit, "/select" to change model, "/install" to add models\n'));
 
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true,
+      historySize: 100
+    });
+
+    // Custom SIGINT for readline
+    rl.on('SIGINT', () => {
+      checkDoubleTapExit();
+    });
+
     while (true) {
-      let response;
+      let input;
       try {
-        response = await prompts({
-          type: 'text',
-          name: 'userInput',
-          message: chalk.green('>'),
-        }, {
-          // This explicitly handles Ctrl+C inside the prompt
-          onCancel: () => {
-            checkDoubleTapExit();
-            return false; 
-          }
+        input = await new Promise((resolve) => {
+          rl.question(chalk.green('> '), (answer) => {
+            resolve(answer.trim());
+          });
         });
       } catch (e) {
         break;
       }
 
-      // If user pressed Ctrl+C, response will be empty/undefined due to onCancel: false
-      if (!response || response.userInput === undefined) {
-        continue;
-      }
-      
-      const input = response.userInput.trim();
       if (!input) continue;
       
       if (input.toLowerCase() === 'exit') {
         console.log(chalk.blue('Goodbye!'));
+        rl.close();
         break;
       }
 
       // Handle /select command in chat
       if (input.startsWith('/select')) {
+        rl.pause();
         await handleSelect();
-        // Refresh session vars after selection
+        rl.resume();
         const newConfig = loadConfig();
-        // Re-print current status
         console.log(chalk.blue(`Switched to: ${newConfig.provider} (${newConfig.model})`));
         continue;
       }
@@ -240,7 +241,9 @@ program
       if (input.startsWith('/install')) {
         const parts = input.split(' ');
         const modelToInstall = parts[1];
+        rl.pause();
         await handleInstall(modelToInstall);
+        rl.resume();
         continue;
       }
 
@@ -250,35 +253,38 @@ program
       let lastLineCount = 0;
 
       try {
-        // Use current selection for this turn
         const currentConfig = loadConfig();
         const activeProvider = cmd.provider || currentConfig.provider || provider;
         const activeModel = cmd.model || currentConfig.model || model;
 
         await agent.run(input, history, (token) => {
           fullResponse += token;
-          
           const formatted = formatMarkdown(fullResponse);
           
-          // Move cursor up by lastLineCount
+          // 1. Move cursor back to the start of the bot response
           if (lastLineCount > 0) {
             readline.moveCursor(process.stdout, 0, -lastLineCount);
-            readline.clearScreenDown(process.stdout);
           }
+          // Move to column 5 (length of "Bot: ")
+          readline.cursorTo(process.stdout, 5);
+          // Clear everything from the cursor down
+          readline.clearScreenDown(process.stdout);
           
+          // 2. Print the new formatted content
           process.stdout.write(formatted);
           
-          // Calculate new line count
-          // We need to account for wrapping
-          const lines = formatted.split('\n');
-          let count = 0;
+          // 3. Calculate how many lines the new content takes
           const cols = process.stdout.columns || 80;
-          lines.forEach(line => {
-            // Very basic wrap calculation
-            const lineLength = line.replace(/\u001b\[[0-9;]*m/g, '').length;
-            count += Math.max(1, Math.ceil(lineLength / cols));
+          const lines = formatted.split('\n');
+          let currentLineCount = 0;
+          
+          lines.forEach((line, index) => {
+            const cleanLine = line.replace(/\u001b\[[0-9;]*m/g, '');
+            const effectiveLength = (index === 0) ? cleanLine.length + 5 : cleanLine.length;
+            currentLineCount += Math.max(1, Math.ceil(effectiveLength / cols));
           });
-          lastLineCount = count - 1; // -1 because we're already on the first line
+          
+          lastLineCount = currentLineCount - 1;
         }, { provider: activeProvider, model: activeModel });
         
         process.stdout.write('\n\n');
