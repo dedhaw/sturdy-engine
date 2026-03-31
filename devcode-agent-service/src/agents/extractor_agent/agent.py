@@ -11,4 +11,6 @@ class ExtractorAgent(BaseAgent):
         full_summary = ""
         async for token in self.run(messages, provider=provider, model=model, stream=True):
             full_summary += token
+            
+        self.log("extractor_agent", f"Summary: {full_summary}")
         return full_summary
