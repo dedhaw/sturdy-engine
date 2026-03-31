@@ -57,6 +57,7 @@ program
   .description('Start an interactive chat with the AI')
   .option('-p, --provider <provider>', 'AI provider to use (openai or ollama)')
   .option('-m, --model <model>', 'Specific model to use')
+  .option('-b, --boost', 'Boost mode: skip all approvals', false)
   .action(async (cmd) => {
     await handleChat(client, cmd, checkDoubleTapExit);
   });
