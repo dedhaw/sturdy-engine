@@ -30,6 +30,21 @@ async function handleInChatCommand(input, client, rl) {
     return true;
   }
 
+  if (lowercaseInput === '/help') {
+    console.log(chalk.yellow('\nAvailable Commands:'));
+    console.log(chalk.cyan('  /quit    ') + '- Exit the chat session');
+    console.log(chalk.cyan('  /select  ') + '- Interactively switch between models and providers');
+    console.log(chalk.cyan('  /install ') + '- Install a specific local model (Ollama)');
+    console.log(chalk.cyan('  /clear   ') + '- Clear the terminal screen');
+    console.log(chalk.cyan('  /help    ') + '- Show this list of commands\n');
+    return true;
+  }
+
+  if (lowercaseInput === '/clear') {
+    console.clear();
+    return true;
+  }
+
   if (input.startsWith('/')) {
     console.log(chalk.yellow(`Unknown command: ${input}`));
     return true;

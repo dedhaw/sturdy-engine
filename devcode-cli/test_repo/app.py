@@ -1,44 +1,55 @@
 from typing import List
 
-def two_sum(nums: List[int], target: int) -> List[int]:
+def binary_search(nums: List[int], target: int) -> int:
     """
-    Finds two numbers in the list 'nums' that add up to the 'target'.
+    Perform a binary search on the sorted list 'nums' to find the index of 'target'.
     
     Args:
-        nums (List[int]): A list of integers.
-        target (int): The target sum.
+        nums (List[int]): A sorted list of integers.
+        target (int): The integer to search for.
         
     Returns:
-        List[int]: A list containing the indices of the two numbers that add up to the target.
+        int: The index of the target if found, otherwise -1.
+    """
+    left, right = 0, len(nums) - 1
+    
+    while left <= right:
+        mid = left + (right - left) // 2
+        mid_value = nums[mid]
         
-    Raises:
-        ValueError: If no two numbers add up to the target.
-    """
-    num_to_index = {}
+        if mid_value == target:
+            return mid
+        elif mid_value < target:
+            left = mid + 1
+        else:
+            right = mid - 1
     
-    for index, number in enumerate(nums):
-        complement = target - number
-        if complement in num_to_index:
-            return [num_to_index[complement], index]
-        num_to_index[number] = index
-    
-    raise ValueError("No two numbers add up to the target")
+    return -1
 
-# --- ADDED TEST FUNCTION ---
-def test_two_sum():
+def test_binary_search():
     """
-    Test the two_sum function with sample input.
+    Test the binary_search function with sample input.
     """
-    nums = [2, 7, 11, 15]
-    target = 9
-    expected_output = [0, 1]
+    nums = [1, 2, 3, 4, 5]
+    target = 3
+    expected_output = 2
     
-    try:
-        result = two_sum(nums, target)
-        assert result == expected_output, f"Expected {expected_output}, but got {result}"
-        print("Test passed.")
-    except ValueError as e:
-        print(f"Test failed: {e}")
+    result = binary_search(nums, target)
+    assert result == expected_output, f"Expected {expected_output}, but got {result}"
+    print("Test passed.")
+
+def test_binary_search_not_found():
+    """
+    Test the binary_search function when target is not in the list.
+    """
+    nums = [1, 2, 3, 4, 5]
+    target = 6
+    expected_output = -1
+    
+    result = binary_search(nums, target)
+    assert result == expected_output, f"Expected {expected_output}, but got {result}"
+    print("Test passed.")
 
 if __name__ == "__main__":
-    test_two_sum()
+    test_binary_search()
+    test_binary_search_not_found()

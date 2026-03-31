@@ -2,7 +2,11 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const dotenv = require('dotenv');
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, processEnv: process.env });
+}
 
 const BackendClient = require('./api_clients/backend_client');
 const { handleInstall } = require('./commands/install');

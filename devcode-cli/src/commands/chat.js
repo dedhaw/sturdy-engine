@@ -1,13 +1,13 @@
 const chalk = require('chalk');
-const readline = require('readline');
-const prompts = require('prompts');
+const { intro, outro, spinner, isCancel, note, log, select: clackSelect, text: clackText } = require('@clack/prompts');
+const { AutoComplete } = require('enquirer');
 const ChatAgent = require('../agents/chat_agent');
 const { loadConfig } = require('../utils/config');
 const { formatMarkdown } = require('../utils/formatter');
 const { handleInChatCommand } = require('../utils/command_handler');
 const { getRepoStructure } = require('../utils/repo_explorer');
 
-async function handleChat(client, cmd, checkDoubleTapExit) {
+async function handleChat(client, cmd) {
   const config = loadConfig();
   const provider = cmd.provider || config.provider || 'openai';
   const model = cmd.model || config.model || (provider === 'openai' ? 'gpt-4o' : null);
@@ -15,130 +15,135 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
   const agent = new ChatAgent(client);
   const history = [];
 
-  console.log(chalk.blue(`DevCode CLI Chat (${provider}${model ? ': ' + model : ''})`));
-  console.log(chalk.gray('Type "/quit" to exit, "/select" to change model, "/install" to add models\n'));
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-    historySize: 100
-  });
-
-  let isBotStreaming = false;
-  let isInterrupted = false;
-
-  rl.on('SIGINT', () => {
-    if (isBotStreaming) {
-      isInterrupted = true;
-      process.stdout.write(chalk.yellow('\n\n[Response Interrupted]\n'));
-    } else {
-      checkDoubleTapExit();
-    }
-  });
+  console.clear();
+  intro(chalk.bold.white.bgBlue('  DEVCODE CLI  '));
+  log.info(`${chalk.gray('Mode:')} ${chalk.cyan(provider)} ${chalk.gray('|')} ${chalk.blue(model || 'default')}`);
+  log.info(chalk.gray('Type your message or use / for commands.\n'));
 
   while (true) {
-    let input;
-    try {
-      input = await new Promise((resolve) => {
-        rl.question(chalk.green('> '), (answer) => {
-          resolve(answer.trim());
-        });
-      });
-    } catch (e) {
-      break;
+    const input = await clackText({
+      message: chalk.cyan('*'),
+      placeholder: 'Type a message or / for commands...',
+      validate: (value) => {
+        if (!value) return 'Please enter a message';
+      }
+    });
+
+    if (isCancel(input)) {
+      outro(chalk.blue('Goodbye!'));
+      process.exit(0);
     }
 
-    if (!input) continue;
-    const handled = await handleInChatCommand(input, client, rl);
+    let finalInput = input.trim();
+
+    const knownCommands = ['/help', '/select', '/install', '/clear', '/quit'];
+    if (finalInput === '/' || (finalInput.startsWith('/') && !knownCommands.includes(finalInput))) {
+      try {
+        const prompt = new AutoComplete({
+          name: 'command',
+          message: chalk.yellow('Execute Command'),
+          choices: [
+            { name: '/help', message: 'help    - Show available commands', value: '/help' },
+            { name: '/select', message: 'select  - Change model or provider', value: '/select' },
+            { name: '/install', message: 'install - Install a local model', value: '/install' },
+            { name: '/clear', message: 'clear   - Clear terminal', value: '/clear' },
+            { name: '/quit', message: 'quit    - Exit session', value: '/quit' }
+          ],
+          initial: finalInput,
+          suggest(input, choices) {
+            const needle = input.toLowerCase();
+            return choices.filter(c => c.name.toLowerCase().startsWith(needle));
+          }
+        });
+
+        const selected = await prompt.run();
+        if (selected) {
+          finalInput = selected;
+        } else {
+          continue;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    const mockRl = { 
+        close: () => {}, 
+        pause: () => {}, 
+        resume: () => {},
+        setPrompt: () => {},
+        prompt: () => {}
+    };
+    
+    const handled = await handleInChatCommand(finalInput, client, mockRl);
     if (handled) continue;
 
     let fullResponse = '';
-    let lastLineCount = 0;
     let currentPlan = null;
-    isBotStreaming = true;
-    isInterrupted = false;
-
-    process.stdout.write(chalk.cyan('Bot: '));
-
     const modifiedFiles = new Map();
+    const s = spinner();
+    s.start('Thinking...');
 
     try {
       const activeProvider = (loadConfig()).provider || provider;
       const activeModel = (loadConfig()).model || model;
       const repoStructure = getRepoStructure(process.cwd());
 
-      await agent.run(input, history, (data) => {
-        if (isInterrupted) return;
-
+      await agent.run(finalInput, history, (data) => {
         if (data.type === 'status') {
-          readline.cursorTo(process.stdout, 0);
-          readline.clearLine(process.stdout, 0);
-          process.stdout.write(chalk.gray(`[Thinking: ${data.content}]`));
-          return;
-        }
-
-        if (data.type === 'plan') {
-          readline.cursorTo(process.stdout, 0);
-          readline.clearLine(process.stdout, 0);
+          s.message(`${chalk.gray('[')}${chalk.cyan(data.content)}${chalk.gray(']')}`);
+        } else if (data.type === 'plan') {
+          s.stop(chalk.green('Implementation plan generated'));
           currentPlan = data.steps;
-          process.stdout.write(chalk.yellow('\n\nImplementation Plan Generated:\n'));
-          currentPlan.forEach(s => {
-            console.log(chalk.gray(`  - [ ] ${s.description}`));
+          let planText = '';
+          currentPlan.forEach(step => {
+            planText += `${chalk.yellow('•')} ${step.description}\n`;
           });
-          return;
-        }
-
-        if (data.type === 'chunk') {
+          note(planText.trim(), chalk.bold.yellow('Implementation Plan'));
+          s.start('Waiting for step approval...');
+        } else if (data.type === 'chunk') {
           if (fullResponse === '') {
-            readline.cursorTo(process.stdout, 0);
-            readline.clearLine(process.stdout, 0);
-            process.stdout.write(chalk.cyan('Bot: '));
+            s.stop(chalk.green('Response Ready'));
+            console.log();
+            process.stdout.write(chalk.blue('┌  ') + chalk.bold('Assistant') + '\n');
+            process.stdout.write(chalk.blue('│  '));
           }
           fullResponse += data.content;
-          const formatted = formatMarkdown(fullResponse);
-          if (lastLineCount > 0) {
-            readline.moveCursor(process.stdout, 0, -lastLineCount);
-          }
-          readline.cursorTo(process.stdout, 5);
-          readline.clearScreenDown(process.stdout);
+          const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
           process.stdout.write(formatted);
-          
-          const cols = process.stdout.columns || 80;
-          const lines = formatted.split('\n');
-          let currentLineCount = 0;
-          lines.forEach((line, index) => {
-            const cleanLine = line.replace(/\u001b\[[0-9;]*m/g, '');
-            const effectiveLength = (index === 0) ? cleanLine.length + 5 : cleanLine.length;
-            currentLineCount += Math.max(1, Math.ceil(effectiveLength / cols));
-          });
-          lastLineCount = currentLineCount - 1;
         }
-      }, { provider: activeProvider, model: activeModel, repoStructure, basePath: process.cwd(), session_id: sessionId });
+      }, { 
+        provider: activeProvider, 
+        model: activeModel, 
+        repoStructure, 
+        basePath: process.cwd(), 
+        session_id: sessionId 
+      });
 
-      isBotStreaming = false;
-      process.stdout.write('\n\n');
+      if (fullResponse) {
+        process.stdout.write('\n' + chalk.blue('└') + '─'.repeat(50) + '\n\n');
+        history.push({ role: 'user', content: finalInput });
+        history.push({ role: 'assistant', content: fullResponse });
+      }
 
-      // Approval Loop
       if (currentPlan) {
-        rl.pause();
         for (const step of currentPlan) {
-          const response = await prompts({
-            type: 'select',
-            name: 'action',
+          const action = await clackSelect({
             message: `Approve step: ${chalk.cyan(step.description)}?`,
-            choices: [
-              { title: 'Approve & Execute', value: 'approve' },
-              { title: 'Skip', value: 'skip' },
-              { title: 'Abort Plan', value: 'abort' }
+            options: [
+              { value: 'approve', label: 'Approve & Execute' },
+              { value: 'skip', label: 'Skip' },
+              { value: 'abort', label: 'Abort Plan' }
             ]
           });
 
-          if (response.action === 'abort') break;
-          if (response.action === 'skip') continue;
-          if (response.action === 'approve') {
+          if (isCancel(action) || action === 'abort') break;
+          if (action === 'skip') continue;
+
+          if (action === 'approve') {
             const filePath = step.file_path || (step.metadata && step.metadata.file_path);
-            process.stdout.write(chalk.gray(`[Thinking: Implementing changes in ${filePath}...]`));
+            const execSpinner = spinner();
+            execSpinner.start(`Implementing changes in ${chalk.blue(filePath)}...`);
             
             const result = await client.approveStep(sessionId, step.id, process.cwd(), {
               provider: (loadConfig()).provider || provider,
@@ -146,54 +151,47 @@ async function handleChat(client, cmd, checkDoubleTapExit) {
               repoStructure: getRepoStructure(process.cwd())
             });
 
-            readline.cursorTo(process.stdout, 0);
-            readline.clearLine(process.stdout, 0);
-
             if (result.status === 'success') {
-              console.log(chalk.green(`✔ Done. ${filePath} updated.`));
+              execSpinner.stop(chalk.green(`Successfully updated ${filePath}`));
               modifiedFiles.set(filePath, result.code);
             } else {
-              console.log(chalk.red(`✘ Failed: ${result.message}`));
+              execSpinner.stop(chalk.red(`Failed to update ${filePath}: ${result.message}`));
             }
           }
         }
-        rl.resume();
-        // Final Summary
-        console.log(chalk.blue('\nAll steps processed. Summary:'));
-        process.stdout.write(chalk.gray('[Thinking: Summarizing changes...]'));
-        
+
+        log.step('Finalizing session...');
+        const summarySpinner = spinner();
+        summarySpinner.start('Summarizing changes...');
         let summaryResponse = '';
+        
         await agent.run("Summarize the changes made in this session.", history, (data) => {
           if (data.type === 'chunk') {
             if (summaryResponse === '') {
-              readline.cursorTo(process.stdout, 0);
-              readline.clearLine(process.stdout, 0);
-              process.stdout.write(chalk.cyan('Bot: '));
+              summarySpinner.stop(chalk.green('Summary:'));
+              process.stdout.write(chalk.blue('┌  ') + chalk.bold('Session Summary') + '\n');
+              process.stdout.write(chalk.blue('│  '));
             }
             summaryResponse += data.content;
-            process.stdout.write(data.content);
+            const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
+            process.stdout.write(formatted);
           }
         }, { session_id: sessionId });
-        process.stdout.write('\n\n');
+        
+        process.stdout.write('\n' + chalk.blue('└') + '─'.repeat(50) + '\n\n');
 
         if (modifiedFiles.size > 0) {
-          console.log(chalk.blue('--- Final Changes ---'));
+          let changesText = '';
           for (const [path, code] of modifiedFiles) {
             const ext = path.split('.').pop();
-            const markdown = `**File: \`${path}\`**\n\`\`\`${ext}\n${code}\n\`\`\``;
-            console.log(formatMarkdown(markdown));
+            changesText += `${chalk.bold.cyan(path)}\n${chalk.gray('─'.repeat(path.length))}\n\`\`\`${ext}\n${code}\n\`\`\`\n\n`;
           }
-          console.log(chalk.blue('----------------------\n'));
+          note(formatMarkdown(changesText.trim()), chalk.bold.blue('Review Changes'));
         }
       }
-
-      if (fullResponse) {
-        history.push({ role: 'user', content: input });
-        history.push({ role: 'assistant', content: fullResponse });
-      }
     } catch (error) {
-      console.error(chalk.red('\nError: ' + error.message));
-      isBotStreaming = false;
+      s.stop(chalk.red('Error occurred'));
+      log.error(error.message);
     }
   }
 }
