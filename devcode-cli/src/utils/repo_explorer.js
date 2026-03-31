@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const chalk = require('chalk');
 
 function getRepoStructure(dir, ignoreList = ['.git', 'node_modules', '.venv', '__pycache__', 'dist', 'build']) {
+  if (process.env.APP_MODE === 'dev') {
+    console.log(chalk.gray(`[repo_explorer] Refreshing structure for: ${dir}`));
+  }
   let structure = '';
 
   function traverse(currentDir, indent = '') {

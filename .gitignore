@@ -7,3 +7,4 @@ devcode-agent-service/bin/
 bin/
 **/bin/
 *.bin
+# test_repo/

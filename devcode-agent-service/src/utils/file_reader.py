@@ -18,3 +18,15 @@ def read_files_for_context(files_to_read, base_path):
             context_blob += f"\nError reading {file_rel_path}: {str(e)}\n"
             
     return context_blob
+
+def write_file_content(file_rel_path, content, base_path):
+    full_path = os.path.abspath(os.path.join(base_path, file_rel_path))
+    if not full_path.startswith(os.path.abspath(base_path)):
+        return False
+    try:
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return True
+    except Exception:
+        return False

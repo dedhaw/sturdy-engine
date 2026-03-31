@@ -3,7 +3,7 @@ class BackendClient {
     this.baseUrl = baseUrl;
   }
 
-  async chatCompletion(messages, onToken, options = {}) {
+  async chatCompletion(messages, onData, options = {}) {
     const { provider = 'openai', model = null, stream = true, session_id = 'default', repoStructure = null, basePath = null } = options;
 
     try {
@@ -27,26 +27,49 @@ class BackendClient {
         throw new Error(`Backend returned ${response.status}: ${await response.text()}`);
       }
 
-      if (stream) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          if (onToken) {
-            onToken(chunk);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            if (onData) onData(data);
+          } catch (e) {
+            // Ignore partial lines
           }
         }
-      } else {
-        return await response.json();
       }
     } catch (error) {
       console.error('Error connecting to backend:', error.message);
       throw error;
     }
+  }
+
+  async approveStep(sessionId, stepId, basePath, options = {}) {
+    const { provider = 'openai', model = null, repoStructure = null } = options;
+    const response = await fetch(`${this.baseUrl}/chat/steps/${sessionId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        step_id: stepId, 
+        base_path: basePath,
+        provider,
+        model,
+        repo_structure: repoStructure
+      }),
+    });
+    if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+    return await response.json();
   }
 
   async getInstalledModels() {
@@ -77,24 +100,22 @@ class BackendClient {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
         for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const data = JSON.parse(line);
-              if (onProgress) {
-                onProgress(data);
-              }
-            } catch (e) {
-              // Ignore partial JSON chunks
-            }
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            if (onProgress) onProgress(data);
+          } catch (e) {
           }
         }
       }

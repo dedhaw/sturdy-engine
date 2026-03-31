@@ -2,72 +2,116 @@ from agents.base_agent import BaseAgent
 from agents.chat_agent.prompts import MASTERPROMPT
 from agents.context_manager import ContextManager
 from agents.intent_agent.agent import IntentAgent
+from agents.planner_agent.agent import PlannerAgent
+from agents.coding_agent.agent import CodingAgent
 from utils.ollama_manager import OllamaManager
-from utils.file_reader import read_files_for_context
+from utils.file_reader import read_files_for_context, write_file_content
+from utils.step_tracker import StepTracker, StepStatus
 import os
+import json
 
 class ChatAgent(BaseAgent):
     def __init__(self):
         super().__init__()
         self.sessions = {}
+        self.trackers = {}
         self.ollama_manager = OllamaManager()
         self.intent_agent = IntentAgent()
+        self.planner_agent = PlannerAgent()
+        self.coding_agent = CodingAgent()
 
-    def get_system_prompt(self, repo_structure=None):
+    def get_system_prompt(self, repo_structure=None, step_summary=None):
         prompt = MASTERPROMPT
         if repo_structure:
             prompt += f"\n\nCurrent Repository Structure:\n{repo_structure}"
+        if step_summary:
+            prompt += f"\n\n{step_summary}"
         return prompt
 
     async def run(self, messages, session_id="default", provider="openai", model=None, stream=True, repo_structure=None, base_path=None):
-        self.log("chat_agent", f"Run called with repo_structure={'Yes' if repo_structure else 'No'}, base_path={base_path}")
+        self.log("chat_agent", f"Run started. Base Path: {base_path}")
+        if messages:
+            self.log("chat_agent", f"User Query: {messages[-1].get('content', '')}")
+        
         if session_id not in self.sessions:
             self.sessions[session_id] = ContextManager(max_context=15)
+            self.trackers[session_id] = StepTracker()
         
         cm = self.sessions[session_id]
+        tracker = self.trackers[session_id]
         
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get('role') if isinstance(last_msg, dict) else getattr(last_msg, 'role', 'user')
-            content = last_msg.get('content') if isinstance(last_msg, dict) else getattr(last_msg, 'content', '')
+            role = last_msg.get('role', 'user')
+            content = last_msg.get('content', '')
             
             if repo_structure and base_path:
                 intent = await self.intent_agent.analyze(content, repo_structure, provider=provider, model=model)
-                files_to_read = intent.get("files_to_read", [])
                 
+                if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
+                    plan = await self.planner_agent.create_plan(content, repo_structure, provider=provider, model=model)
+                    if plan:
+                        new_steps = []
+                        for p_step in plan:
+                            step = tracker.add_step(
+                                description=f"{p_step['action'].capitalize()} {p_step['file_path']}: {p_step['description']}",
+                                action_type=p_step['action'],
+                                metadata={"file_path": p_step['file_path'], "plan": plan}
+                            )
+                            new_steps.append(step)
+                        yield json.dumps({"type": "plan", "steps": new_steps}) + "\n"
+                        return
+
+                files_to_read = intent.get("files_to_read", [])
                 if files_to_read:
                     file_context = read_files_for_context(files_to_read, base_path)
                     if file_context:
-                        messages.insert(-1, {"role": "system", "content": f"Relevant files:\n{file_context}"})
+                        messages.insert(-1, {"role": "system", "content": f"Context from existing files:\n{file_context}"})
 
             await cm.add_message(role=role, content=content, provider=provider, model=model)
 
         managed_messages = cm.get_messages()
-        system_content = self.get_system_prompt(repo_structure)
-        has_system = False
-        for m in managed_messages:
-            if m.get('role') == 'system':
-                m['content'] = system_content
-                has_system = True
-                break
+        system_content = self.get_system_prompt(repo_structure, tracker.get_summary())
         
-        if not has_system:
+        if managed_messages and managed_messages[0].get('role') == 'system':
+            managed_messages[0]['content'] = system_content
+        else:
             managed_messages.insert(0, {"role": "system", "content": system_content})
 
         if provider == "ollama":
             self.ollama_manager.start_server()
 
         full_response = ""
-        async for token in super().run(
-            messages=managed_messages,
-            provider=provider,
-            model=model,
-            stream=stream
-        ):
+        async for token in super().run(messages=managed_messages, provider=provider, model=model, stream=stream):
             full_response += token
-            yield token
+            yield json.dumps({"type": "chunk", "content": token}) + "\n"
         
-        self.log("chat_agent", f"Response: {full_response}")
-
         if full_response:
             await cm.add_message(role="assistant", content=full_response, provider=provider, model=model)
+
+    async def execute_step(self, session_id, step_id, base_path, provider="openai", model=None, repo_structure=None):
+        tracker = self.trackers.get(session_id)
+        if not tracker: return {"status": False, "message": "Tracker not found"}
+        
+        step = next((s for s in tracker.steps if s["id"] == step_id), None)
+        if not step: return {"status": False, "message": "Step not found"}
+
+        plan = step["metadata"].get("plan")
+        file_path = step["metadata"].get("file_path")
+        file_context = read_files_for_context([file_path], base_path)
+        
+        code = await self.coding_agent.generate_code(
+            plan=plan, 
+            step=step, 
+            file_context=file_context, 
+            repo_structure=repo_structure,
+            provider=provider,
+            model=model
+        )
+        
+        success = write_file_content(file_path, code, base_path)
+        if success:
+            tracker.update_step(step_id, StepStatus.COMPLETED)
+        else:
+            tracker.update_step(step_id, StepStatus.FAILED)
+        return {"status": success, "code": code}
