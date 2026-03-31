@@ -3,3 +3,7 @@ devcode-agent-service/bin/
 .gemini
 .gemini
 devcode-agent-service/bin/
+
+bin/
+**/bin/
+*.bin
