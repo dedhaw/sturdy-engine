@@ -66,5 +66,7 @@ class ChatAgent(BaseAgent):
             full_response += token
             yield token
         
+        self.log("chat_agent", f"Response: {full_response}")
+
         if full_response:
             await cm.add_message(role="assistant", content=full_response, provider=provider, model=model)
