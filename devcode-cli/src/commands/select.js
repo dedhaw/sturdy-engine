@@ -1,62 +1,66 @@
 const chalk = require('chalk');
-const prompts = require('prompts');
+const { select, isCancel, spinner, note } = require('@clack/prompts');
 const { saveConfig } = require('../utils/config');
 
-async function handleSelect(client) {
-  const response = await prompts([
-    {
-      type: 'select',
-      name: 'provider',
+async function handleSelect(client, rl) {
+  // Pause the main chat RL to let Clack take over the stream
+  rl.pause();
+  if (process.stdin.isTTY) process.stdin.setRawMode(false);
+
+  try {
+    const provider = await select({
       message: 'Choose AI Provider',
-      choices: [
-        { title: 'OpenAI (Cloud)', value: 'openai' },
-        { title: 'Ollama (Local)', value: 'ollama' }
-      ],
-      initial: 0
-    }
-  ]);
+      options: [
+        { label: 'OpenAI (Cloud)', value: 'openai' },
+        { label: 'Ollama (Local)', value: 'ollama' }
+      ]
+    });
 
-  if (!response.provider) return;
+    if (isCancel(provider)) return;
 
-  let model;
-  if (response.provider === 'ollama') {
-    console.log(chalk.blue('\nFetching installed local models...'));
-    try {
-      const { models } = await client.getInstalledModels();
-      if (!models || models.length === 0) {
-        console.log(chalk.yellow('No Ollama models installed. Use "devcode install" first.'));
+    let model;
+    if (provider === 'ollama') {
+      const s = spinner();
+      s.start('Fetching installed local models...');
+      try {
+        const { models } = await client.getInstalledModels();
+        s.stop('Local models fetched');
+        
+        if (!models || models.length === 0) {
+          note('No Ollama models installed. Use "/install" first.', 'Notice');
+          return;
+        }
+        
+        model = await select({
+          message: 'Choose Ollama Model',
+          options: models.map(m => ({ label: m.name, value: m.name })),
+        });
+      } catch (e) {
+        s.stop('Error fetching models', 1);
+        console.error(chalk.red('Error: ' + e.message));
         return;
       }
-      
-      const modelResponse = await prompts({
-        type: 'select',
-        name: 'model',
-        message: 'Choose Ollama Model',
-        choices: models.map(m => ({ title: m.name, value: m.name })),
+    } else {
+      model = await select({
+        message: 'Choose OpenAI Model',
+        options: [
+          { label: 'GPT-4o (High quality)', value: 'gpt-4o' },
+          { label: 'GPT-4o mini (Fast & Cheap)', value: 'gpt-4o-mini' },
+          { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' }
+        ]
       });
-      model = modelResponse.model;
-    } catch (e) {
-      console.error(chalk.red('Error fetching local models: ' + e.message));
-      return;
     }
-  } else {
-    const modelResponse = await prompts({
-      type: 'select',
-      name: 'model',
-      message: 'Choose OpenAI Model',
-      choices: [
-        { title: 'GPT-4o (High quality)', value: 'gpt-4o' },
-        { title: 'GPT-4o mini (Fast & Cheap)', value: 'gpt-4o-mini' },
-        { title: 'GPT-4 Turbo', value: 'gpt-4-turbo' }
-      ],
-      initial: 0
-    });
-    model = modelResponse.model;
-  }
 
-  if (model) {
-    saveConfig({ provider: response.provider, model });
-    console.log(chalk.green(`\nSelection saved: ${chalk.bold(response.provider)} using ${chalk.bold(model)}\n`));
+    if (isCancel(model)) return;
+
+    if (model) {
+      saveConfig({ provider, model });
+      note(`${chalk.bold(provider)} using ${chalk.bold(model)}`, 'Selection Saved');
+    }
+  } finally {
+    // Restore the main chat RL and raw mode
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    rl.resume();
   }
 }
 

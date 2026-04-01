@@ -120,8 +120,7 @@ async function handleChat(client, cmd) {
 
       if (!input) continue;
 
-      const mockRl = { close: cleanupAndExit, pause: () => rl.pause(), resume: () => rl.resume() };
-      const handled = await handleInChatCommand(input, client, mockRl, chatContext);
+      const handled = await handleInChatCommand(input, client, rl, chatContext);
       if (handled) continue;
 
       if (input === '/quit') {

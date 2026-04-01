@@ -1,68 +1,80 @@
 const chalk = require('chalk');
-const prompts = require('prompts');
+const { select, isCancel, spinner, note, log } = require('@clack/prompts');
 
-async function handleInstall(client, modelName) {
+async function handleInstall(client, modelName, rl) {
   let selectedModel = modelName;
 
-  if (!selectedModel) {
-    console.log(chalk.blue('\nFetching available models from catalog...'));
-    try {
-      const { models } = await client.getAvailableModels();
-      if (!models || models.length === 0) {
-        console.log(chalk.yellow('No models found in catalog.'));
+  // Pause the main chat RL to let Clack take over the stream
+  rl.pause();
+  if (process.stdin.isTTY) process.stdin.setRawMode(false);
+
+  try {
+    if (!selectedModel) {
+      const s = spinner();
+      s.start('Fetching available models from catalog...');
+      try {
+        const { models } = await client.getAvailableModels();
+        s.stop('Catalog fetched');
+        
+        if (!models || models.length === 0) {
+          note('No models found in catalog.', 'Notice');
+          return;
+        }
+
+        selectedModel = await select({
+          message: 'Select a model to install',
+          options: models.map(m => ({
+            label: `${m.name.padEnd(20)} - ${m.description}`,
+            value: m.name
+          }))
+        });
+
+        if (isCancel(selectedModel)) return;
+      } catch (e) {
+        s.stop('Error fetching models', 1);
+        console.error(chalk.red('Error: ' + e.message));
         return;
       }
+    }
 
-      const response = await prompts({
-        type: 'select',
-        name: 'model',
-        message: 'Select a model to install',
-        choices: models.map(m => ({
-          title: `${chalk.green(m.name.padEnd(20))} - ${m.description}`,
-          value: m.name
-        })),
-        initial: 0
+    const installSpinner = spinner();
+    installSpinner.start(`Installing model: ${selectedModel}...`);
+    
+    try {
+      let lastStatus = '';
+      let hasError = false;
+      let errorMessage = '';
+
+      await client.installModel(selectedModel, (data) => {
+        if (data.status === 'error') {
+          hasError = true;
+          errorMessage = data.message || 'Unknown error';
+          return;
+        }
+
+        if (data.status && data.status !== lastStatus) {
+          installSpinner.message(`Status: ${data.status}`);
+          lastStatus = data.status;
+        }
+        if (data.completed && data.total) {
+          const percent = Math.round((data.completed / data.total) * 100);
+          installSpinner.message(`Progress: ${percent}% (${data.status})`);
+        }
       });
 
-      if (!response.model) return;
-      selectedModel = response.model;
-    } catch (e) {
-      console.error(chalk.red('Error fetching available models: ' + e.message));
-      return;
+      if (hasError) {
+        installSpinner.stop(`Failed to install ${selectedModel}: ${errorMessage}`, 1);
+      } else {
+        installSpinner.stop(`Successfully installed ${selectedModel}!`);
+      }
+    } catch (error) {
+      installSpinner.stop('Installation failed', 1);
+      console.error(chalk.red('\n' + error.message));
     }
-  }
-
-  console.log(chalk.blue(`\nInstalling model: ${selectedModel}...`));
-  try {
-    let lastStatus = '';
-    let hasError = false;
-    let errorMessage = '';
-
-    await client.installModel(selectedModel, (data) => {
-      if (data.status === 'error') {
-        hasError = true;
-        errorMessage = data.message || 'Unknown error';
-        process.stdout.write(`\n${chalk.red('Error:')} ${errorMessage}`);
-        return;
-      }
-
-      if (data.status && data.status !== lastStatus) {
-        process.stdout.write(`\n${chalk.cyan('Status:')} ${data.status}`);
-        lastStatus = data.status;
-      }
-      if (data.completed && data.total) {
-        const percent = Math.round((data.completed / data.total) * 100);
-        process.stdout.write(`\r${chalk.cyan('Progress:')} ${percent}%`);
-      }
-    });
-
-    if (hasError) {
-      console.log(chalk.red(`\n\nFailed to install ${selectedModel}.`));
-    } else {
-      console.log(chalk.green(`\n\nSuccessfully installed ${selectedModel}!\n`));
-    }
-  } catch (error) {
-    console.error(chalk.red('\nInstallation failed: ' + error.message));
+  } finally {
+    // Restore the main chat RL and raw mode
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    rl.resume();
   }
 }
 

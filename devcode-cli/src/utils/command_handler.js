@@ -12,16 +12,15 @@ async function handleInChatCommand(input, client, rl, context = {}) {
   }
 
   if (lowercaseInput.startsWith('/select')) {
-    await handleSelect(client);
+    await handleSelect(client, rl);
     const newConfig = loadConfig();
-    console.log(chalk.blue(`Switched to: ${newConfig.provider} (${newConfig.model})`));
     return true;
   }
 
   if (lowercaseInput.startsWith('/install')) {
     const parts = input.split(' ');
     const modelToInstall = parts[1];
-    await handleInstall(client, modelToInstall);
+    await handleInstall(client, modelToInstall, rl);
     return true;
   }
 
