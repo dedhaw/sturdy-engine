@@ -2,6 +2,7 @@ const chalk = require('chalk');
 const { loadConfig } = require('./config');
 const { handleSelect } = require('../commands/select');
 const { handleInstall } = require('../commands/install');
+const { handleUninstall } = require('../commands/uninstall');
 
 async function handleInChatCommand(input, client, rl, context = {}) {
   const lowercaseInput = input.toLowerCase();
@@ -24,16 +25,23 @@ async function handleInChatCommand(input, client, rl, context = {}) {
     return true;
   }
 
-  if (lowercaseInput === '/help') {
-    console.log(chalk.yellow('\nAvailable Commands:'));
-    console.log(chalk.cyan('  /quit    ') + '- Exit the chat session');
-    console.log(chalk.cyan('  /select  ') + '- Interactively switch between models and providers');
-    console.log(chalk.cyan('  /install ') + '- Install a specific local model (Ollama)');
-    console.log(chalk.cyan('  /boost   ') + '- Toggle Boost Mode (skip all approvals)');
-    console.log(chalk.cyan('  /clear   ') + '- Clear the terminal screen');
-    console.log(chalk.cyan('  /help    ') + '- Show this list of commands\n');
+  if (lowercaseInput.startsWith('/uninstall')) {
+    await handleUninstall(client, rl);
     return true;
   }
+
+  if (lowercaseInput === '/help') {
+    console.log(chalk.yellow('\nAvailable Commands:'));
+    console.log(chalk.cyan('  /quit      ') + '- Exit the chat session');
+    console.log(chalk.cyan('  /select    ') + '- Interactively switch between models and providers');
+    console.log(chalk.cyan('  /install   ') + '- Install a specific local model (Ollama)');
+    console.log(chalk.cyan('  /uninstall ') + '- Remove an installed local model');
+    console.log(chalk.cyan('  /boost     ') + '- Toggle Boost Mode (skip all approvals)');
+    console.log(chalk.cyan('  /clear     ') + '- Clear the terminal screen');
+    console.log(chalk.cyan('  /help      ') + '- Show this list of commands\n');
+    return true;
+  }
+
 
   if (lowercaseInput === '/boost') {
     context.boost = !context.boost;

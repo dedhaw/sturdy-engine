@@ -94,6 +94,12 @@ class BackendClient {
     return await response.json();
   }
 
+  async getModelTags(modelName) {
+    const response = await fetch(`${this.baseUrl}/models/tags/${modelName}`);
+    if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+    return await response.json();
+  }
+
   async installModel(modelName, onProgress) {
     try {
       const response = await fetch(`${this.baseUrl}/models/install`, {
@@ -133,6 +139,14 @@ class BackendClient {
       console.error('Error installing model:', error.message);
       throw error;
     }
+  }
+
+  async uninstallModel(modelName) {
+    const response = await fetch(`${this.baseUrl}/models/uninstall/${modelName}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+    return await response.json();
   }
 }
 

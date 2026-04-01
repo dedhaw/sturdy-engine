@@ -18,3 +18,6 @@ build-prod:
 
 link-cli:
 	cd devcode-cli && npm link
+
+build-cli:
+	make link-cli && make build-prod

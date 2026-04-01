@@ -72,14 +72,16 @@ async function handleChat(client, cmd) {
           name: 'command',
           message: 'Select a command:',
           choices: [
-            { title: '/help    - Show available commands', value: '/help' },
-            { title: '/boost   - Toggle auto-approve mode', value: '/boost' },
-            { title: '/select  - Change model or provider', value: '/select' },
-            { title: '/install - Install a local model', value: '/install' },
-            { title: '/clear   - Clear terminal', value: '/clear' },
-            { title: '/quit    - Exit session', value: '/quit' },
+            { title: '/help      - Show available commands', value: '/help' },
+            { title: '/boost     - Toggle auto-approve mode', value: '/boost' },
+            { title: '/select    - Change model or provider', value: '/select' },
+            { title: '/install   - Install a local model', value: '/install' },
+            { title: '/uninstall - Remove a local model', value: '/uninstall' },
+            { title: '/clear     - Clear terminal', value: '/clear' },
+            { title: '/quit      - Exit session', value: '/quit' },
             { title: 'Cancel', value: '' }
-          ]
+          ],
+
         });
 
         if (process.stdin.isTTY) process.stdin.setRawMode(true);

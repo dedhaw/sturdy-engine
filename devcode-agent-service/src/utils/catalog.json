@@ -2,38 +2,47 @@
   "models": [
     {
       "name": "llama3.2",
+      "parameters": "3B",
       "description": "Meta's lightweight 3.2B model (Recommended for Mac)"
     },
     {
       "name": "llama3.1",
+      "parameters": "8B",
       "description": "Meta's flagship 8B model - strong all-rounder"
     },
     {
       "name": "deepseek-r1:7b",
+      "parameters": "7B",
       "description": "DeepSeek's powerful 7B reasoning model"
     },
     {
       "name": "deepseek-r1:14b",
+      "parameters": "14B",
       "description": "DeepSeek's advanced 14B reasoning model"
     },
     {
       "name": "qwen2.5-coder:7b",
+      "parameters": "7B",
       "description": "Alibaba's specialized 7B code model"
     },
     {
       "name": "qwen2.5-coder:14b",
+      "parameters": "14B",
       "description": "Alibaba's advanced 14B code model"
     },
     {
       "name": "mistral",
+      "parameters": "7B",
       "description": "Fast and efficient general-purpose 7B model"
     },
     {
       "name": "phi3",
+      "parameters": "3.8B",
       "description": "Microsoft's compact high-performance 3.8B model"
     },
     {
       "name": "gemma2:9b",
+      "parameters": "9B",
       "description": "Google's powerful 9B open model"
     }
   ]

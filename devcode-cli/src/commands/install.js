@@ -2,50 +2,66 @@ const chalk = require('chalk');
 const { select, isCancel, spinner, note, log } = require('@clack/prompts');
 
 async function handleInstall(client, modelName, rl) {
-  let selectedModel = modelName;
+  let finalModelToInstall = modelName;
 
-  // Pause the main chat RL to let Clack take over the stream
   rl.pause();
   if (process.stdin.isTTY) process.stdin.setRawMode(false);
 
   try {
-    if (!selectedModel) {
+    if (!finalModelToInstall) {
+      // Step 1: Pick the base model
       const s = spinner();
-      s.start('Fetching available models from catalog...');
-      try {
-        const { models } = await client.getAvailableModels();
-        s.stop('Catalog fetched');
-        
-        if (!models || models.length === 0) {
-          note('No models found in catalog.', 'Notice');
-          return;
-        }
+      s.start('Fetching available models from Ollama Library...');
+      const { models } = await client.getAvailableModels();
+      s.stop('Catalog fetched');
+      
+      if (!models || models.length === 0) {
+        note('No models found in catalog.', 'Notice');
+        return;
+      }
 
-        selectedModel = await select({
-          message: 'Select a model to install',
-          options: models.map(m => ({
-            label: `${m.name.padEnd(20)} - ${m.description}`,
-            value: m.name
+      const baseModel = await select({
+        message: 'Select a base model',
+        options: models.map(m => ({
+          label: `${m.name.padEnd(20)} [${m.parameters}] - ${m.description}`,
+          value: m.name
+        }))
+      });
+
+      if (isCancel(baseModel)) return;
+
+      // Step 2: Pick the specific tag/version
+      const tagSpinner = spinner();
+      tagSpinner.start(`Fetching available versions for ${baseModel}...`);
+      const { tags } = await client.getModelTags(baseModel);
+      tagSpinner.stop('Versions fetched');
+
+      if (!tags || tags.length === 0) {
+        // Fallback to 'latest' if no tags found or error
+        finalModelToInstall = `${baseModel}:latest`;
+      } else {
+        const selectedTag = await select({
+          message: `Select version for ${chalk.cyan(baseModel)}`,
+          options: tags.map(t => ({
+            label: `${t.name.padEnd(15)} (${t.size || 'unknown size'})`,
+            value: t.full_name
           }))
         });
 
-        if (isCancel(selectedModel)) return;
-      } catch (e) {
-        s.stop('Error fetching models', 1);
-        console.error(chalk.red('Error: ' + e.message));
-        return;
+        if (isCancel(selectedTag)) return;
+        finalModelToInstall = selectedTag;
       }
     }
 
     const installSpinner = spinner();
-    installSpinner.start(`Installing model: ${selectedModel}...`);
+    installSpinner.start(`Installing model: ${finalModelToInstall}...`);
     
     try {
       let lastStatus = '';
       let hasError = false;
       let errorMessage = '';
 
-      await client.installModel(selectedModel, (data) => {
+      await client.installModel(finalModelToInstall, (data) => {
         if (data.status === 'error') {
           hasError = true;
           errorMessage = data.message || 'Unknown error';
@@ -63,16 +79,15 @@ async function handleInstall(client, modelName, rl) {
       });
 
       if (hasError) {
-        installSpinner.stop(`Failed to install ${selectedModel}: ${errorMessage}`, 1);
+        installSpinner.stop(`Failed to install ${finalModelToInstall}: ${errorMessage}`, 1);
       } else {
-        installSpinner.stop(`Successfully installed ${selectedModel}!`);
+        installSpinner.stop(`Successfully installed ${finalModelToInstall}!`);
       }
     } catch (error) {
       installSpinner.stop('Installation failed', 1);
       console.error(chalk.red('\n' + error.message));
     }
   } finally {
-    // Restore the main chat RL and raw mode
     if (process.stdin.isTTY) process.stdin.setRawMode(true);
     rl.resume();
   }
