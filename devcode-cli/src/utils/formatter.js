@@ -38,18 +38,15 @@ function formatMarkdown(text) {
     return chalk.bgGray.white(` ${code} `);
   });
 
-  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, (match, bold) => {
-    return chalk.bold.yellow(bold);
+  formatted = formatted.replace(/^# (.+)$/gm, (match, title) => {
+    return chalk.bold.blue.underline(title);
   });
 
-  formatted = formatted.replace(/\*([^*]+)\*/g, (match, italic) => {
-    return chalk.italic(italic);
+  formatted = formatted.replace(/^## (.+)$/gm, (match, title) => {
+    return chalk.bold.blue(title);
   });
 
-  formatted = formatted.replace(/^(#+)\s+(.+)$/gm, (match, hashes, title) => {
-    const level = hashes.length;
-    if (level === 1) return chalk.bold.magenta.underline(title);
-    if (level === 2) return chalk.bold.magenta(title);
+  formatted = formatted.replace(/^### (.+)$/gm, (match, title) => {
     return chalk.bold.cyan(title);
   });
 

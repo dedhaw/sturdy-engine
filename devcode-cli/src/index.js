@@ -18,21 +18,6 @@ const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 const client = new BackendClient();
 
-let lastCtrlC = 0;
-function checkDoubleTapExit() {
-  const now = Date.now();
-  if (now - lastCtrlC < 1000) {
-    console.log(chalk.blue('\nExiting DevCode...'));
-    process.exit(0);
-  }
-  lastCtrlC = now;
-  console.log(chalk.gray('\nPress Ctrl+C again to exit'));
-}
-
-process.on('SIGINT', () => {
-  checkDoubleTapExit();
-});
-
 program
   .name('devcode')
   .description('A CLI tool for AI-powered coding assistance')
@@ -59,7 +44,7 @@ program
   .option('-m, --model <model>', 'Specific model to use')
   .option('-b, --boost', 'Boost mode: skip all approvals', false)
   .action(async (cmd) => {
-    await handleChat(client, cmd, checkDoubleTapExit);
+    await handleChat(client, cmd);
   });
 
 program.parse(process.argv);

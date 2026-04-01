@@ -19,7 +19,7 @@ When asked to add features or modify code, you MUST follow this hierarchy:
 ---
 
 ## 2. Invariant Standards (Universal)
-* **Documentation:** Every new function/class requires a docstring (Google Style) or JSDoc.
+* **No Comments:** You MUST NOT include any comments, docstrings, or explanatory remarks within the source code. The implementation must be self-documenting through highly descriptive naming.
 * **Naming:** Use highly descriptive, domain-specific names. Avoid generic terms like `data`, `temp`, or `item`.
 * **Error Boundaries:** Define and use custom exception hierarchies. Never allow raw internal errors to leak to the end-user without a clean wrapper.
 * **Modernity:** Use the latest stable language features (e.g., Python 3.12+, Java 21, ESNext).

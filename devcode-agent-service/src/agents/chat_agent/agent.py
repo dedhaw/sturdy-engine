@@ -52,13 +52,11 @@ class ChatAgent(BaseAgent):
             
             if repo_structure and base_path:
                 yield json.dumps({"type": "status", "content": "Classifying intent"}) + "\n"
-                # Pass managed messages for full context
                 intent = await self.intent_agent.analyze(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                 print(f"[INTENT_AGENT] Result: {json.dumps(intent, indent=2)}")
                 
                 if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
                     yield json.dumps({"type": "status", "content": "Planning implementation"}) + "\n"
-                    # Pass managed messages for full context
                     plan = await self.planner_agent.create_plan(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                     print(f"[PLANNER_AGENT] Plan: {json.dumps(plan, indent=2)}")
                     if plan:
@@ -69,7 +67,7 @@ class ChatAgent(BaseAgent):
                                 action_type=p_step['action'],
                                 metadata={"file_path": p_step['file_path'], "plan": plan}
                             )
-                            step["file_path"] = p_step['file_path'] # Add at top level
+                            step["file_path"] = p_step['file_path']
                             new_steps.append(step)
                             print(f"[PLANNER_AGENT] Step {i+1}: {step['description']}")
 
@@ -117,7 +115,6 @@ class ChatAgent(BaseAgent):
         plan = step["metadata"].get("plan")
         file_path = step["metadata"].get("file_path")
         
-        # Read old content for diffing
         full_path = os.path.join(base_path, file_path)
         old_code = ""
         if os.path.exists(full_path):
@@ -144,7 +141,6 @@ class ChatAgent(BaseAgent):
             model=model
         )
         
-        # Generate Diff with context
         diff_list = list(difflib.unified_diff(
             old_code.splitlines(keepends=True),
             new_code.splitlines(keepends=True),
