@@ -1,6 +1,16 @@
 class BackendClient {
   constructor(baseUrl = 'http://localhost:8040/api') {
     this.baseUrl = baseUrl;
+    this.rootUrl = 'http://localhost:8040';
+  }
+
+  async isRunning() {
+    try {
+      const response = await fetch(this.rootUrl, { signal: AbortSignal.timeout(1000) });
+      return response.ok;
+    } catch (e) {
+      return false;
+    }
   }
 
   async chatCompletion(messages, onData, options = {}) {

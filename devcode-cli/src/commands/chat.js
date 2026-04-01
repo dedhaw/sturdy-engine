@@ -7,6 +7,7 @@ const { loadConfig } = require('../utils/config');
 const { formatMarkdown } = require('../utils/formatter');
 const { handleInChatCommand } = require('../utils/command_handler');
 const { getRepoStructure } = require('../utils/repo_explorer');
+const { stopBackend } = require('../utils/backend_manager');
 
 const userInputHistory = [];
 
@@ -44,6 +45,7 @@ async function handleChat(client, cmd) {
 
   return new Promise(async (resolveSession) => {
     const cleanupAndExit = () => {
+      stopBackend();
       if (process.stdin.isTTY) process.stdin.setRawMode(false);
       rl.close();
       process.stdout.write('\n');

@@ -15,3 +15,9 @@ run:
 lint:
 	source $(VENV) && \
 	ruff check .
+
+build:
+	source $(VENV) && \
+	pip install pyinstaller && \
+	pyinstaller --onefile src/main.py --name devcode-backend --clean && \
+	echo "✅ Backend binary built in devcode-agent-service/dist/"

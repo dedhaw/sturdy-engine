@@ -19,13 +19,8 @@ app.include_router(models.router, prefix="/api")
 async def startup_event():
     print("Starting up DevCode Backend...")
     if not ollama_manager.is_installed():
-        print("Ollama not found. Attempting auto-install...")
-        try:
-            await ollama_manager.download()
-        except Exception as e:
-            print(f"Auto-install failed: {e}. Please install Ollama manually.")
-    
-    if ollama_manager.is_installed():
+        print("Ollama command not found. Local AI models will not be available until Ollama is installed (ollama.com).")
+    else:
         ollama_manager.start_server()
 
 @app.on_event("shutdown")
