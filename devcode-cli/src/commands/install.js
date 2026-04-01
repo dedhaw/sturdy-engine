@@ -1,5 +1,6 @@
 const chalk = require('chalk');
-const { select, isCancel, spinner, note, log } = require('@clack/prompts');
+const { spinner, note, log } = require('@clack/prompts');
+const { AutoComplete } = require('enquirer');
 
 async function handleInstall(client, modelName, rl) {
   let finalModelToInstall = modelName;
@@ -9,7 +10,6 @@ async function handleInstall(client, modelName, rl) {
 
   try {
     if (!finalModelToInstall) {
-      // Step 1: Pick the base model
       const s = spinner();
       s.start('Fetching available models from Ollama Library...');
       const { models } = await client.getAvailableModels();
@@ -20,35 +20,43 @@ async function handleInstall(client, modelName, rl) {
         return;
       }
 
-      const baseModel = await select({
-        message: 'Select a base model',
-        options: models.map(m => ({
-          label: `${m.name.padEnd(20)} [${m.parameters}] - ${m.description}`,
+      const baseModelPrompt = new AutoComplete({
+        name: 'model',
+        message: chalk.cyan('Search base model'),
+        choices: models.map(m => ({
+          name: m.name,
+          message: `${chalk.bold(m.name.padEnd(20))} - ${m.description}`,
           value: m.name
-        }))
+        })),
+        limit: 10,
+        footer: chalk.gray('(Type to filter, Use arrow keys to select)')
       });
 
-      if (isCancel(baseModel)) return;
+      const baseModel = await baseModelPrompt.run();
+      if (!baseModel) return;
 
-      // Step 2: Pick the specific tag/version
       const tagSpinner = spinner();
       tagSpinner.start(`Fetching available versions for ${baseModel}...`);
       const { tags } = await client.getModelTags(baseModel);
       tagSpinner.stop('Versions fetched');
 
       if (!tags || tags.length === 0) {
-        // Fallback to 'latest' if no tags found or error
         finalModelToInstall = `${baseModel}:latest`;
       } else {
-        const selectedTag = await select({
+        const tagPrompt = new AutoComplete({
+          name: 'tag',
           message: `Select version for ${chalk.cyan(baseModel)}`,
-          options: tags.map(t => ({
-            label: `${t.name.padEnd(15)} (${t.size || 'unknown size'})`,
+          choices: tags.map(t => ({
+            name: t.full_name,
+            message: `${t.name.padEnd(15)} (${t.size || 'unknown size'})`,
             value: t.full_name
-          }))
+          })),
+          limit: 15,
+          footer: chalk.gray('(Type parameter size e.g. "14b" to filter)')
         });
 
-        if (isCancel(selectedTag)) return;
+        const selectedTag = await tagPrompt.run();
+        if (!selectedTag) return;
         finalModelToInstall = selectedTag;
       }
     }
@@ -87,6 +95,7 @@ async function handleInstall(client, modelName, rl) {
       installSpinner.stop('Installation failed', 1);
       console.error(chalk.red('\n' + error.message));
     }
+  } catch (err) {
   } finally {
     if (process.stdin.isTTY) process.stdin.setRawMode(true);
     rl.resume();
