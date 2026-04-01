@@ -9,4 +9,11 @@ def generate_random_integer() -> int:
     """
     return randint(0, 100)
 
-# Add this new function to the existing list of functions in the file
+def get_hello_world_message() -> str:
+    """
+    Returns the string 'hello world'.
+
+    Returns:
+        str: The string 'hello world'.
+    """
+    return "hello world"

@@ -10,7 +10,9 @@ class BaseAgent:
 
     def log(self, tag, message):
         if os.getenv("APP_MODE") == "dev":
-            print(f"[{tag}] {message}")
+            print(f"\n{'-'*20} DEBUG: {tag.upper()} {'-'*20}")
+            print(message)
+            print(f"{'-'*50}\n")
 
     def get_system_prompt(self):
         # This will be overridden by subclasses or loaded from their specific prompts.py

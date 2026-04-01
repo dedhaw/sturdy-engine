@@ -18,10 +18,17 @@ class PlannerAgent(BaseAgent):
         full_response = ""
         async for token in self.run(run_messages, provider=provider, model=model, stream=True):
             full_response += token
+        
+        self.log("planner_agent", f"Raw Response:\n{full_response}")
+
         try:
-            json_match = re.search(r'\[.*\]', full_response, re.DOTALL)
+            # Look for the last JSON list in case of reasoning/filler
+            json_match = re.findall(r'\[.*\]', full_response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                parsed = json.loads(json_match[-1])
+                self.log("planner_agent", f"Parsed Plan:\n{json.dumps(parsed, indent=2)}")
+                return parsed
             return json.loads(full_response)
-        except Exception:
+        except Exception as e:
+            self.log("planner_agent", f"Parse Error: {str(e)}")
             return []

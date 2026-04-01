@@ -47,16 +47,15 @@ class CodingAgent(BaseAgent):
             async for token in self.ollama.chat_completion(messages, model, True):
                 full_response += token
         
+        self.log("coding_agent", f"Raw Response:\n{full_response}")
+
         # Robust Parsing: 
-        # 1. Remove XML-style justifications
         import re
         code_part = re.sub(r'<justification>.*?</justification>', '', full_response, flags=re.DOTALL).strip()
         
-        # 2. Fallback: Remove old-style delimiter if it persists
         if "--- ARCHITECT_JUSTIFICATION ---" in code_part:
             code_part = code_part.split("--- ARCHITECT_JUSTIFICATION ---")[0].strip()
         
-        # 3. Defensive: Strip any markdown code block indicators if the LLM ignored instructions
         if code_part.startswith("```"):
             lines = code_part.splitlines()
             if lines[0].startswith("```"):
@@ -65,4 +64,5 @@ class CodingAgent(BaseAgent):
                 lines = lines[:-1]
             code_part = "\n".join(lines).strip()
             
+        self.log("coding_agent", f"Extracted Code:\n{code_part}")
         return code_part

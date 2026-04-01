@@ -53,12 +53,12 @@ class ChatAgent(BaseAgent):
             if repo_structure and base_path:
                 yield json.dumps({"type": "status", "content": "Classifying intent"}) + "\n"
                 intent = await self.intent_agent.analyze(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
-                print(f"[INTENT_AGENT] Result: {json.dumps(intent, indent=2)}")
+                self.log("chat_agent", f"Intent: {json.dumps(intent, indent=2)}")
                 
                 if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
                     yield json.dumps({"type": "status", "content": "Planning implementation"}) + "\n"
                     plan = await self.planner_agent.create_plan(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
-                    print(f"[PLANNER_AGENT] Plan: {json.dumps(plan, indent=2)}")
+                    self.log("chat_agent", f"Plan: {json.dumps(plan, indent=2)}")
                     if plan:
                         new_steps = []
                         for i, p_step in enumerate(plan):
@@ -69,7 +69,6 @@ class ChatAgent(BaseAgent):
                             )
                             step["file_path"] = p_step['file_path']
                             new_steps.append(step)
-                            print(f"[PLANNER_AGENT] Step {i+1}: {step['description']}")
 
                         yield json.dumps({"type": "plan", "steps": new_steps}) + "\n"
                         return
@@ -84,24 +83,26 @@ class ChatAgent(BaseAgent):
             await cm.add_message(role=role, content=content, provider=provider, model=model)
 
         managed_messages = cm.get_messages()
+        # Add latest user message if not already there
+        latest_msg = {"role": "user", "content": content}
+        
         system_content = self.get_system_prompt(repo_structure, tracker.get_summary())
         
-        if managed_messages and managed_messages[0].get('role') == 'system':
-            managed_messages[0]['content'] = system_content
-        else:
-            managed_messages.insert(0, {"role": "system", "content": system_content})
-
+        # We need to reconstruct messages for the final chat agent run
+        final_messages = [{"role": "system", "content": system_content}]
+        final_messages.extend(managed_messages)
+        
         if provider == "ollama":
             self.ollama_manager.start_server()
 
         yield json.dumps({"type": "status", "content": "Generating response"}) + "\n"
         full_response = ""
-        async for token in super().run(messages=managed_messages, provider=provider, model=model, stream=stream):
+        async for token in super().run(messages=final_messages, provider=provider, model=model, stream=stream):
             full_response += token
             yield json.dumps({"type": "chunk", "content": token}) + "\n"
         
         if full_response:
-            print(f"[CHAT_AGENT] Full Response: {full_response[:100]}...")
+            self.log("chat_agent", f"Full Response: {full_response}")
             await cm.add_message(role="assistant", content=full_response, provider=provider, model=model)
 
     async def execute_step(self, session_id, step_id, base_path, provider="openai", model=None, repo_structure=None):
@@ -111,7 +112,7 @@ class ChatAgent(BaseAgent):
         step = next((s for s in tracker.steps if s["id"] == step_id), None)
         if not step: return {"status": False, "message": "Step not found"}
 
-        print(f"\n[CODING_AGENT] Executing step {step_id}: {step['description']}")
+        self.log("chat_agent", f"Executing step {step_id}: {step['description']}")
         plan = step["metadata"].get("plan")
         file_path = step["metadata"].get("file_path")
         
@@ -124,10 +125,10 @@ class ChatAgent(BaseAgent):
             except Exception:
                 pass
 
-        print(f"[CODING_AGENT] Reading context for {file_path}")
+        self.log("chat_agent", f"Reading context for {file_path}")
         file_context = read_files_for_context([file_path], base_path)
         
-        print(f"[CODING_AGENT] Generating code...")
+        self.log("chat_agent", "Generating code...")
         cm = self.sessions.get(session_id)
         history = cm.get_messages() if cm else []
         
@@ -150,13 +151,13 @@ class ChatAgent(BaseAgent):
         ))
         diff = "".join(diff_list)
 
-        print(f"[CODING_AGENT] Implementation complete. Writing to {file_path}")
+        self.log("chat_agent", f"Implementation complete. Writing to {file_path}")
         success = write_file_content(file_path, new_code, base_path)
         if success:
-            print(f"[CODING_AGENT] Successfully updated {file_path}")
+            self.log("chat_agent", f"Successfully updated {file_path}")
             tracker.update_step(step_id, StepStatus.COMPLETED)
         else:
-            print(f"[CODING_AGENT] Failed to update {file_path}")
+            self.log("chat_agent", f"Failed to update {file_path}")
             tracker.update_step(step_id, StepStatus.FAILED)
         
         return {

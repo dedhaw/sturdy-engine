@@ -22,12 +22,16 @@ class IntentAgent(BaseAgent):
         async for token in self.run(run_messages, provider=provider, model=model, stream=True):
             full_response += token
             
-        self.log("intent_agent", f"Analysis: {full_response}")
+        self.log("intent_agent", f"Raw Response:\n{full_response}")
 
         try:
-            json_match = re.search(r'\{.*\}', full_response, re.DOTALL)
+            # Look for the last JSON object in case of reasoning/filler
+            json_match = re.findall(r'\{.*\}', full_response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                parsed = json.loads(json_match[-1])
+                self.log("intent_agent", f"Parsed Intent:\n{json.dumps(parsed, indent=2)}")
+                return parsed
             return json.loads(full_response)
-        except Exception:
-            return {"files_to_read": [], "reasoning": "Parse Error"}
+        except Exception as e:
+            self.log("intent_agent", f"Parse Error: {str(e)}")
+            return {"files_to_read": [], "reasoning": f"Parse Error: {str(e)}"}
