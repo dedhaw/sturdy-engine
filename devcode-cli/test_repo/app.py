@@ -1,36 +1,33 @@
 import logging
+from typing import List
 
-def print_hello_world():
+def binary_search(sorted_nums: List[int], target: int) -> int:
     logger = logging.getLogger(__name__)
-    logger.info(get_hello_world_message())
+    low = 0
+    high = len(sorted_nums) - 1
+    
+    while low <= high:
+        mid = (low + high) // 2
+        mid_val = sorted_nums[mid]
+        
+        if mid_val == target:
+            logger.debug(f"Found target {target} at index {mid}")
+            return mid
+        elif mid_val < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    
+    logger.debug(f"Target {target} not found in array")
+    return -1
 
-def get_hello_world_message():
-    return "hello world"
-
-# New function to print hello world
-def display_message():
+def run_binary_search_example():
+    sorted_nums = [1, 3, 5, 7, 9]
+    target = 5
+    index = binary_search(sorted_nums, target)
     logger = logging.getLogger(__name__)
-    message = get_hello_world_message()
-    logger.info(message)
-    # Ensuring that the existing logic remains intact and the new functionality is appended.
-    print_hello_world()
-
-# 2sum code example
-def two_sum(nums: list[int], target: int) -> list[int]:
-    num_to_index = {}
-    for index, num in enumerate(nums):
-        complement = target - num
-        if complement in num_to_index:
-            return [num_to_index[complement], index]
-        num_to_index[num] = index
-
-# Example usage of the two_sum function
-def run_two_sum_example():
-    nums = [2, 7, 11, 15]
-    target = 9
-    indices = two_sum(nums, target)
-    logger = logging.getLogger(__name__)
-    logger.info(f"Indices for two sum: {indices}")
+    logger.info(f"Binary search result: Index of {target} is {index}")
 
 if __name__ == "__main__":
     run_two_sum_example()
+    run_binary_search_example()

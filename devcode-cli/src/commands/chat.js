@@ -162,15 +162,18 @@ async function handleChat(client, cmd) {
             });
             note(planText.trim(), chalk.bold.yellow('Implementation Plan'));
           } else if (data.type === 'chunk') {
-            if (fullResponse === '') {
+            if (fullResponse === '' && data.content.trim() !== '') {
               s.stop(chalk.green('Response Ready'));
               process.stdout.write('\n' + chalk.blue('┌  ') + chalk.bold('Assistant') + '\n');
               process.stdout.write(chalk.blue('│  '));
             }
-            fullResponse += data.content;
-            const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
-            process.stdout.write(formatted);
+            if (fullResponse !== '' || data.content.trim() !== '') {
+              fullResponse += data.content;
+              const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
+              process.stdout.write(formatted);
+            }
           }
+
         }, { 
           provider: activeProvider, 
           model: activeModel, 
@@ -248,16 +251,19 @@ async function handleChat(client, cmd) {
                 if (data.type === 'status') {
                   summarySpinner.message(chalk.cyan(data.content));
                 } else if (data.type === 'chunk') {
-                  if (summaryResponse === '') {
+                  if (summaryResponse === '' && data.content.trim() !== '') {
                     summarySpinner.stop(chalk.green('Summary Ready'));
                     process.stdout.write(chalk.blue('┌  ') + chalk.bold('Session Summary') + '\n');
                     process.stdout.write(chalk.blue('│  '));
                   }
-                  summaryResponse += data.content;
-                  const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
-                  process.stdout.write(formatted);
+                  if (summaryResponse !== '' || data.content.trim() !== '') {
+                    summaryResponse += data.content;
+                    const formatted = data.content.replace(/\n/g, '\n' + chalk.blue('│  '));
+                    process.stdout.write(formatted);
+                  }
                 }
               }, { 
+ 
                 session_id: sessionId,
                 provider: (loadConfig()).provider || provider,
                 model: (loadConfig()).model || model,

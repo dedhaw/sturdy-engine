@@ -205,6 +205,10 @@ function getWebviewContent() {
         vscode.postMessage({ type: "toggleAI" });
       }
 
+      function approveStep(stepId) {
+        vscode.postMessage({ type: "approveStep", stepId: stepId });
+      }
+
       window.addEventListener("message", event => {
         const msg = event.data;
         const statusIndicator = document.getElementById("statusIndicator");
@@ -229,15 +233,48 @@ function getWebviewContent() {
           statusIndicator.style.display = "none";
           const m = document.createElement("div");
           m.className = "message bot plan-message";
-          let planHtml = "<strong>Implementation Plan:</strong><ul>";
+          let planHtml = "<strong>Implementation Plan:</strong><ul style='list-style: none; padding: 0;'>";
           msg.steps.forEach(step => {
-            planHtml += \`<li>\${step.description}</li>\`;
+            planHtml += `
+              <li id="step-${step.id}" style="margin-bottom: 10px; padding: 8px; border: 1px solid #444; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>${step.description}</span>
+                  <button class="approve-btn" onclick="approveStep(${step.id})" style="background: #007acc; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 2px;">Approve</button>
+                </div>
+                <div id="diff-${step.id}" style="display: none; margin-top: 8px; font-family: monospace; font-size: 11px; background: #1e1e1e; padding: 5px; overflow-x: auto; white-space: pre;"></div>
+              </li>`;
           });
-          planHtml += "</ul><p>Ready to proceed?</p>";
+          planHtml += "</ul>";
           m.innerHTML = planHtml;
           chat.appendChild(m);
           chat.scrollTop = chat.scrollHeight;
         }
+        if (msg.type === "stepCompleted") {
+          const stepLi = document.getElementById(`step-${msg.stepId}`);
+          if (stepLi) {
+            stepLi.style.borderColor = "#28a745";
+            const btn = stepLi.querySelector('button');
+            if (btn) {
+              btn.textContent = "✓ Done";
+              btn.disabled = true;
+              btn.style.background = "#28a745";
+            }
+
+            if (msg.diff) {
+              const diffDiv = document.getElementById(`diff-${msg.stepId}`);
+              diffDiv.style.display = "block";
+              // Basic diff coloring
+              const coloredDiff = msg.diff.split('\n').map(line => {
+                if (line.startsWith('+')) return `<span style="color: #28a745;">${line}</span>`;
+                if (line.startsWith('-')) return `<span style="color: #d73a49;">${line}</span>`;
+                if (line.startsWith('@@')) return `<span style="color: #005cc5;">${line}</span>`;
+                return line;
+              }).join('\n');
+              diffDiv.innerHTML = coloredDiff;
+            }
+          }
+        }
+
         if (msg.type === "aiModeChanged") {
           isOfflineMode = msg.isOffline;
           if (isOfflineMode) {
