@@ -7,6 +7,7 @@ from agents.coding_agent.agent import CodingAgent
 from utils.ollama_manager import OllamaManager
 from utils.file_reader import read_files_for_context, write_file_content
 from utils.step_tracker import StepTracker, StepStatus
+from utils.code_search import search_codebase, format_search_results
 import os
 import json
 import difflib
@@ -31,13 +32,7 @@ class ChatAgent(BaseAgent):
 
     async def run(self, messages, session_id="default", provider="openai", model=None, stream=True, repo_structure=None, base_path=None):
         self.log("chat_agent", f"Run started. Base Path: {base_path}")
-        print(f"\n[CHAT_AGENT] Starting run for session {session_id}")
 
-        if messages:
-            user_query = messages[-1].get('content', '')
-            self.log("chat_agent", f"User Query: {user_query}")
-            print(f"[CHAT_AGENT] User Query: {user_query}")
-        
         if session_id not in self.sessions:
             self.sessions[session_id] = ContextManager(max_context=15)
             self.trackers[session_id] = StepTracker()
@@ -45,6 +40,8 @@ class ChatAgent(BaseAgent):
         cm = self.sessions[session_id]
         tracker = self.trackers[session_id]
         
+        content = ""
+        role = "user"
         if messages:
             last_msg = messages[-1]
             role = last_msg.get('role', 'user')
@@ -55,10 +52,28 @@ class ChatAgent(BaseAgent):
                 intent = await self.intent_agent.analyze(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                 self.log("chat_agent", f"Intent: {json.dumps(intent, indent=2)}")
                 
+                search_context = ""
+                search_queries = intent.get("search_queries", [])
+                if search_queries:
+                    yield json.dumps({"type": "status", "content": "Searching codebase"}) + "\n"
+                    for query in search_queries:
+                        self.log("chat_agent", f"Searching for: {query}")
+                        results = search_codebase(query, base_path)
+                        search_context += format_search_results(results) + "\n"
+                    
+                    if search_context:
+                        self.log("chat_agent", f"Search Results:\n{search_context}")
+                        messages.insert(-1, {"role": "system", "content": f"Information found via code search:\n{search_context}"})
+
                 if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
                     yield json.dumps({"type": "status", "content": "Planning implementation"}) + "\n"
-                    plan = await self.planner_agent.create_plan(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
+                    current_messages = cm.get_messages() + [{"role": "user", "content": content}]
+                    if search_context:
+                        current_messages.insert(-1, {"role": "system", "content": f"Information found via code search:\n{search_context}"})
+                    
+                    plan = await self.planner_agent.create_plan(current_messages, repo_structure, provider=provider, model=model)
                     self.log("chat_agent", f"Plan: {json.dumps(plan, indent=2)}")
+
                     if plan:
                         new_steps = []
                         for i, p_step in enumerate(plan):
@@ -75,7 +90,7 @@ class ChatAgent(BaseAgent):
 
                 files_to_read = intent.get("files_to_read", [])
                 if files_to_read:
-                    print(f"[CHAT_AGENT] Reading files for context: {files_to_read}")
+                    self.log("chat_agent", f"Reading files for context: {files_to_read}")
                     file_context = read_files_for_context(files_to_read, base_path)
                     if file_context:
                         messages.insert(-1, {"role": "system", "content": f"Context from existing files:\n{file_context}"})
@@ -83,12 +98,9 @@ class ChatAgent(BaseAgent):
             await cm.add_message(role=role, content=content, provider=provider, model=model)
 
         managed_messages = cm.get_messages()
-        # Add latest user message if not already there
         latest_msg = {"role": "user", "content": content}
         
         system_content = self.get_system_prompt(repo_structure, tracker.get_summary())
-        
-        # We need to reconstruct messages for the final chat agent run
         final_messages = [{"role": "system", "content": system_content}]
         final_messages.extend(managed_messages)
         

@@ -18,14 +18,12 @@ async function handleChat(client, cmd) {
   const chatContext = { boost: cmd.boost || false };
 
   const isDev = process.env.APP_MODE === 'dev';
-  const debugLog = (msg) => {
-    if (isDev) console.log(chalk.gray(`[DEBUG] ${msg}`));
-  };
+  const debugLog = (msg) => { if (isDev) console.log(chalk.gray(`[DEBUG] ${msg}`)); };
 
   let isBotStreaming = false;
   let isInterrupted = false;
-  let isMenuOpen = false;
   let lastCtrlC = 0;
+  let isMenuOpen = false;
 
   console.clear();
   intro(chalk.bold.white.bgBlue('  DEVCODE CLI  '));
@@ -55,7 +53,7 @@ async function handleChat(client, cmd) {
   }
   readline.emitKeypressEvents(process.stdin);
 
-  const onKeypress = async (char, key) => {
+  process.stdin.on('keypress', async (char, key) => {
     if (isBotStreaming || isMenuOpen) return;
 
     if (char === '/' && rl.line.length === 0) {
@@ -92,9 +90,7 @@ async function handleChat(client, cmd) {
         rl.prompt(true);
       }
     }
-  };
-
-  process.stdin.on('keypress', onKeypress);
+  });
 
   rl.on('SIGINT', () => {
     if (isBotStreaming) {
@@ -175,7 +171,6 @@ async function handleChat(client, cmd) {
         session_id: sessionId 
       });
 
-
       if (isInterrupted) {
         if (fullResponse === '') s.stop(chalk.yellow('Interrupted'), 1);
         else process.stdout.write('\n' + chalk.blue('│\n└') + chalk.yellow('── [INTERRUPTED]') + '\n\n');
@@ -215,13 +210,14 @@ async function handleChat(client, cmd) {
             const filePath = step.file_path || (step.metadata && step.metadata.file_path);
             const execSpinner = spinner();
             execSpinner.start(`Implementing changes in ${chalk.blue(filePath)}...`);
-
+            
             debugLog(`Executing step: ${step.description}`);
             const result = await client.approveStep(sessionId, step.id, process.cwd(), {
               provider: (loadConfig()).provider || provider,
               model: (loadConfig()).model || model,
               repoStructure: getRepoStructure(process.cwd())
             });
+
             if (result.status === 'success') {
               execSpinner.stop(chalk.green(`Successfully updated ${filePath}`));
               modifiedFiles.set(filePath, result);
@@ -260,6 +256,7 @@ async function handleChat(client, cmd) {
               repoStructure: getRepoStructure(process.cwd()),
               basePath: process.cwd()
             });
+            
             if (isInterrupted) {
                 if (summaryResponse === '') summarySpinner.stop(chalk.yellow('Interrupted'), 1);
                 else process.stdout.write('\n' + chalk.blue('│\n└') + chalk.yellow('── [INTERRUPTED]') + '\n\n');

@@ -70,5 +70,6 @@ async def approve_step(session_id: str, request: StepApproveRequest):
     return {
         "status": "success" if result["status"] else "failed",
         "message": "Step executed" if result["status"] else "Execution failed",
-        "code": result.get("code")
+        "code": result.get("code"),
+        "diff": result.get("diff")
     }
