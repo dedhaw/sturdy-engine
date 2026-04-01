@@ -41,13 +41,12 @@ class ChatAgent(BaseAgent):
         tracker = self.trackers[session_id]
         
         content = ""
-        role = "user"
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get('role', 'user')
             content = last_msg.get('content', '')
+            role = last_msg.get('role', 'user')
             
-            if repo_structure and base_path:
+            if role == "user" and repo_structure and base_path:
                 yield json.dumps({"type": "status", "content": "Classifying intent"}) + "\n"
                 intent = await self.intent_agent.analyze(cm.get_messages() + [{"role": "user", "content": content}], repo_structure, provider=provider, model=model)
                 self.log("chat_agent", f"Intent: {json.dumps(intent, indent=2)}")
@@ -57,12 +56,10 @@ class ChatAgent(BaseAgent):
                 if search_queries:
                     yield json.dumps({"type": "status", "content": "Searching codebase"}) + "\n"
                     for query in search_queries:
-                        self.log("chat_agent", f"Searching for: {query}")
                         results = search_codebase(query, base_path)
                         search_context += format_search_results(results) + "\n"
                     
                     if search_context:
-                        self.log("chat_agent", f"Search Results:\n{search_context}")
                         messages.insert(-1, {"role": "system", "content": f"Information found via code search:\n{search_context}"})
 
                 if intent.get("should_delegate") and "planner_agent" in intent.get("target_agents", []):
@@ -90,7 +87,6 @@ class ChatAgent(BaseAgent):
 
                 files_to_read = intent.get("files_to_read", [])
                 if files_to_read:
-                    self.log("chat_agent", f"Reading files for context: {files_to_read}")
                     file_context = read_files_for_context(files_to_read, base_path)
                     if file_context:
                         messages.insert(-1, {"role": "system", "content": f"Context from existing files:\n{file_context}"})
@@ -98,8 +94,6 @@ class ChatAgent(BaseAgent):
             await cm.add_message(role=role, content=content, provider=provider, model=model)
 
         managed_messages = cm.get_messages()
-        latest_msg = {"role": "user", "content": content}
-        
         system_content = self.get_system_prompt(repo_structure, tracker.get_summary())
         final_messages = [{"role": "system", "content": system_content}]
         final_messages.extend(managed_messages)
@@ -137,10 +131,7 @@ class ChatAgent(BaseAgent):
             except Exception:
                 pass
 
-        self.log("chat_agent", f"Reading context for {file_path}")
         file_context = read_files_for_context([file_path], base_path)
-        
-        self.log("chat_agent", "Generating code...")
         cm = self.sessions.get(session_id)
         history = cm.get_messages() if cm else []
         
@@ -154,22 +145,25 @@ class ChatAgent(BaseAgent):
             model=model
         )
         
-        diff_list = list(difflib.unified_diff(
-            old_code.splitlines(keepends=True),
-            new_code.splitlines(keepends=True),
+        def normalize(text):
+            if not text: return ""
+            return text if text.endswith('\n') else text + '\n'
+
+        old_norm = normalize(old_code)
+        new_norm = normalize(new_code)
+
+        diff = "".join(difflib.unified_diff(
+            old_norm.splitlines(keepends=True),
+            new_norm.splitlines(keepends=True),
             fromfile=f"a/{file_path}",
             tofile=f"b/{file_path}",
             n=3
         ))
-        diff = "".join(diff_list)
 
-        self.log("chat_agent", f"Implementation complete. Writing to {file_path}")
         success = write_file_content(file_path, new_code, base_path)
         if success:
-            self.log("chat_agent", f"Successfully updated {file_path}")
             tracker.update_step(step_id, StepStatus.COMPLETED)
         else:
-            self.log("chat_agent", f"Failed to update {file_path}")
             tracker.update_step(step_id, StepStatus.FAILED)
         
         return {

@@ -1,10 +1,16 @@
-from random import randint
+import logging
 
-def generate_random_integer() -> int:
-    return randint(0, 100)
+def print_hello_world():
+    logger = logging.getLogger(__name__)
+    logger.info(get_hello_world_message())
 
-def get_hello_world_message() -> str:
+def get_hello_world_message():
     return "hello world"
 
-def get_chicken_nugget() -> str:
-    return "chicken nugget"
+# New function to print hello world
+def display_message():
+    logger = logging.getLogger(__name__)
+    message = get_hello_world_message()
+    logger.info(message)
+    # Ensuring that the existing logic remains intact and the new functionality is appended.
+    print_hello_world()
